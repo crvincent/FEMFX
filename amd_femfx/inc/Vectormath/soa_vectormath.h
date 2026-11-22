@@ -192,19 +192,19 @@ template< class SoaNFloat > SOA_VECTORMATH_FORCE_INLINE const SoaVector3<SoaNFlo
 
 // Compute the reciprocal of a 3-D vector per element
 // NOTE: 
-// Floating-point behavior matches standard library function _mm_rcp_ps.
+// Floating-point reciprocal behavior follows the standard approximation policy.
 // 
 template< class SoaNFloat > SOA_VECTORMATH_FORCE_INLINE const SoaVector3<SoaNFloat> inv( const SoaVector3<SoaNFloat> & vec );
 
 // Compute the square root of a 3-D vector per element
 // NOTE: 
-// Floating-point behavior matches standard library function _mm_sqrt_ps.
+// Floating-point square-root behavior follows the platform math implementation.
 // 
 template< class SoaNFloat > SOA_VECTORMATH_FORCE_INLINE const SoaVector3<SoaNFloat> sqrt( const SoaVector3<SoaNFloat> & vec );
 
 // Compute the reciprocal square root of a 3-D vector per element
 // NOTE: 
-// Floating-point behavior matches standard library function _mm_rsqrt_ps.
+// Floating-point reciprocal-square-root behavior follows the platform implementation.
 // 
 template< class SoaNFloat > SOA_VECTORMATH_FORCE_INLINE const SoaVector3<SoaNFloat> rsqrt( const SoaVector3<SoaNFloat> & vec );
 
@@ -476,19 +476,19 @@ template< class SoaNFloat > SOA_VECTORMATH_FORCE_INLINE const SoaVector4<SoaNFlo
 
 // Compute the reciprocal of a 4-D vector per element
 // NOTE: 
-// Floating-point behavior matches standard library function _mm_rcp_ps.
+// Floating-point reciprocal behavior follows the standard approximation policy.
 // 
 template< class SoaNFloat > SOA_VECTORMATH_FORCE_INLINE const SoaVector4<SoaNFloat> inv( const SoaVector4<SoaNFloat> & vec );
 
 // Compute the square root of a 4-D vector per element
 // NOTE: 
-// Floating-point behavior matches standard library function _mm_sqrt_ps.
+// Floating-point square-root behavior follows the platform math implementation.
 // 
 template< class SoaNFloat > SOA_VECTORMATH_FORCE_INLINE const SoaVector4<SoaNFloat> sqrt( const SoaVector4<SoaNFloat> & vec );
 
 // Compute the reciprocal square root of a 4-D vector per element
 // NOTE: 
-// Floating-point behavior matches standard library function _mm_rsqrt_ps.
+// Floating-point reciprocal-square-root behavior follows the platform implementation.
 // 
 template< class SoaNFloat > SOA_VECTORMATH_FORCE_INLINE const SoaVector4<SoaNFloat> rsqrt( const SoaVector4<SoaNFloat> & vec );
 
@@ -675,19 +675,19 @@ template< class SoaNFloat > SOA_VECTORMATH_FORCE_INLINE const SoaPoint3<SoaNFloa
 
 // Compute the reciprocal of a 3-D point per element
 // NOTE: 
-// Floating-point behavior matches standard library function _mm_rcp_ps.
+// Floating-point reciprocal behavior follows the standard approximation policy.
 // 
 template< class SoaNFloat > SOA_VECTORMATH_FORCE_INLINE const SoaPoint3<SoaNFloat> inv( const SoaPoint3<SoaNFloat> & pnt );
 
 // Compute the square root of a 3-D point per element
 // NOTE: 
-// Floating-point behavior matches standard library function _mm_sqrt_ps.
+// Floating-point square-root behavior follows the platform math implementation.
 // 
 template< class SoaNFloat > SOA_VECTORMATH_FORCE_INLINE const SoaPoint3<SoaNFloat> sqrt( const SoaPoint3<SoaNFloat> & pnt );
 
 // Compute the reciprocal square root of a 3-D point per element
 // NOTE: 
-// Floating-point behavior matches standard library function _mm_rsqrt_ps.
+// Floating-point reciprocal-square-root behavior follows the platform implementation.
 // 
 template< class SoaNFloat > SOA_VECTORMATH_FORCE_INLINE const SoaPoint3<SoaNFloat> rsqrt( const SoaPoint3<SoaNFloat> & pnt );
 

@@ -35,6 +35,26 @@ THE SOFTWARE.
 namespace AMD
 {
     template<class T>
+    static FM_FORCE_INLINE void FmSetSoaFromHighwayAos(typename T::SoaVector3* result, const FmVector3* aos)
+    {
+        float soa[3][FmHighwayMaxLanes] = {};
+        FmHighwayTransposeAosToSoa(3, &aos[0].x, &soa[0][0], T::width);
+        for (int component = 0; component < 3; ++component)
+            for (uint lane = 0; lane < T::width; ++lane)
+                (component == 0 ? result->x : component == 1 ? result->y : result->z).setSlice(lane, soa[component][lane]);
+    }
+
+    template<class T>
+    static FM_FORCE_INLINE void FmSetSoaFromHighwayAos(typename T::SoaVector4* result, const FmVector4* aos)
+    {
+        float soa[4][FmHighwayMaxLanes] = {};
+        FmHighwayTransposeAosToSoa(4, &aos[0].x, &soa[0][0], T::width);
+        for (int component = 0; component < 4; ++component)
+            for (uint lane = 0; lane < T::width; ++lane)
+                (component == 0 ? result->x : component == 1 ? result->y : component == 2 ? result->z : result->w).setSlice(lane, soa[component][lane]);
+    }
+
+    template<class T>
     struct FmSoaTetShapeParams
     {
         typename T::SoaMatrix4 baryMatrix;   // Matrix that transforms a point within the tet to its barycentric coords
@@ -233,99 +253,25 @@ namespace AMD
         const typename T::SoaVector3& p2,
         const typename T::SoaVector3& p3)
     {
-        FmSoaTetShapeParams<T> shapeParams;
-
-        typename T::SoaFloat x0 = p0.x;
-        typename T::SoaFloat y0 = p0.y;
-        typename T::SoaFloat z0 = p0.z;
-        typename T::SoaFloat x1 = p1.x;
-        typename T::SoaFloat y1 = p1.y;
-        typename T::SoaFloat z1 = p1.z;
-        typename T::SoaFloat x2 = p2.x;
-        typename T::SoaFloat y2 = p2.y;
-        typename T::SoaFloat z2 = p2.z;
-        typename T::SoaFloat x3 = p3.x;
-        typename T::SoaFloat y3 = p3.y;
-        typename T::SoaFloat z3 = p3.z;
-
-        typename T::SoaFloat x01 = x0 - x1;
-        typename T::SoaFloat x02 = x0 - x2;
-        typename T::SoaFloat x03 = x0 - x3;
-        typename T::SoaFloat x10 = -x01;
-        typename T::SoaFloat x12 = x1 - x2;
-        typename T::SoaFloat x13 = x1 - x3;
-        typename T::SoaFloat x20 = -x02;
-        typename T::SoaFloat x21 = -x12;
-        typename T::SoaFloat x23 = x2 - x3;
-        typename T::SoaFloat x30 = -x03;
-        typename T::SoaFloat x31 = -x13;
-        typename T::SoaFloat x32 = -x23;
-
-        typename T::SoaFloat y01 = y0 - y1;
-        typename T::SoaFloat y02 = y0 - y2;
-        typename T::SoaFloat y03 = y0 - y3;
-        typename T::SoaFloat y10 = -y01;
-        typename T::SoaFloat y12 = y1 - y2;
-        typename T::SoaFloat y13 = y1 - y3;
-        typename T::SoaFloat y20 = -y02;
-        typename T::SoaFloat y21 = -y12;
-        typename T::SoaFloat y23 = y2 - y3;
-        typename T::SoaFloat y30 = -y03;
-        typename T::SoaFloat y31 = -y13;
-        typename T::SoaFloat y32 = -y23;
-
-        // determinant of M = [  1  1  1  1 ] = 6.0 x signed volume
-        //                    [ p0 p1 p2 p3 ] 
-
-        typename T::SoaFloat det = (x10*y2 + x02 * y1 + x21 * y0)*z3 + (x01*y3 + x30 * y1 + x13 * y0)*z2 + (x20*y3 + x03 * y2 + x32 * y0)*z1 +
-            (x12*y3 + x31 * y2 + x23 * y1)*z0;
-
-        typename T::SoaFloat m00 = (x1*y2 - x2 * y1)*z3 + (x3*y1 - x1 * y3)*z2 + (x2*y3 - x3 * y2)*z1;
-        typename T::SoaFloat m01 = y12 * z3 + y31 * z2 + y23 * z1;
-        typename T::SoaFloat m02 = x21 * z3 + x13 * z2 + x32 * z1;
-        typename T::SoaFloat m03 = x12 * y3 + x31 * y2 + x23 * y1;
-        typename T::SoaFloat m10 = (x2*y0 - x0 * y2)*z3 + (x0*y3 - x3 * y0)*z2 + (x3*y2 - x2 * y3)*z0;
-        typename T::SoaFloat m11 = y20 * z3 + y03 * z2 + y32 * z0;
-        typename T::SoaFloat m12 = x02 * z3 + x30 * z2 + x23 * z0;
-        typename T::SoaFloat m13 = x20 * y3 + x03 * y2 + x32 * y0;
-        typename T::SoaFloat m20 = (x0*y1 - x1 * y0)*z3 + (x3*y0 - x0 * y3)*z1 + (x1*y3 - x3 * y1)*z0;
-        typename T::SoaFloat m21 = y01 * z3 + y30 * z1 + y13 * z0;
-        typename T::SoaFloat m22 = x10 * z3 + x03 * z1 + x31 * z0;
-        typename T::SoaFloat m23 = x01 * y3 + x30 * y1 + x13 * y0;
-        typename T::SoaFloat m30 = (x1*y0 - x0 * y1)*z2 + (x0*y2 - x2 * y0)*z1 + (x2*y1 - x1 * y2)*z0;
-        typename T::SoaFloat m31 = y10 * z2 + y02 * z1 + y21 * z0;
-        typename T::SoaFloat m32 = x01 * z2 + x20 * z1 + x12 * z0;
-        typename T::SoaFloat m33 = x10 * y2 + x02 * y1 + x21 * y0;
-
-        shapeParams.det = det;
-
-        // baryMatrix transforms [x, y, z, 1]^T to barycentric coords
-
-        typename T::SoaFloat invDet = 1.0f / det;
-
-        shapeParams.baryMatrix = typename T::SoaMatrix4(
-            typename T::SoaVector4(
-                m01 * invDet,
-                m11 * invDet,
-                m21 * invDet,
-                m31 * invDet),
-            typename T::SoaVector4(
-                m02 * invDet,
-                m12 * invDet,
-                m22 * invDet,
-                m32 * invDet),
-            typename T::SoaVector4(
-                m03 * invDet,
-                m13 * invDet,
-                m23 * invDet,
-                m33 * invDet),
-            typename T::SoaVector4(
-                m00 * invDet,
-                m10 * invDet,
-                m20 * invDet,
-                m30 * invDet));
-
-        *resultShapeParams = shapeParams;
+        const typename T::SoaVector3* positions[4] = {&p0, &p1, &p2, &p3};
+        float packed[12][FmHighwayMaxLanes] = {};
+        float bary[16][FmHighwayMaxLanes] = {};
+        float det[FmHighwayMaxLanes] = {};
+        for (int point = 0; point < 4; ++point)
+            for (int component = 0; component < 3; ++component)
+                for (uint lane = 0; lane < T::width; ++lane)
+                    packed[point * 3 + component][lane] =
+                        (component == 0 ? positions[point]->x : component == 1 ? positions[point]->y : positions[point]->z).getSlice(lane);
+        FmHighwayComputeShapeParams(&packed[0][0], &bary[0][0], det, T::width);
+        typename T::SoaVector4* columns[4] = {&resultShapeParams->baryMatrix.col0,
+            &resultShapeParams->baryMatrix.col1, &resultShapeParams->baryMatrix.col2,
+            &resultShapeParams->baryMatrix.col3};
+        for (int column = 0; column < 4; ++column)
+            for (int component = 0; component < 4; ++component)
+                for (uint lane = 0; lane < T::width; ++lane)
+                    (component == 0 ? columns[column]->x : component == 1 ? columns[column]->y : component == 2 ? columns[column]->z : columns[column]->w).setSlice(lane, bary[column * 4 + component][lane]);
+        for (uint lane = 0; lane < T::width; ++lane)
+            resultShapeParams->det.setSlice(lane, det[lane]);
     }
 
     template<class T>
@@ -337,38 +283,24 @@ namespace AMD
         const typename T::SoaVector3& unrotatedOffset2,
         const typename T::SoaVector3& unrotatedOffset3)
     {
-        typename T::SoaFloat a0 = shapeParams.GetA0();
-        typename T::SoaFloat a1 = shapeParams.GetA1();
-        typename T::SoaFloat a2 = shapeParams.GetA2();
-        typename T::SoaFloat a3 = shapeParams.GetA3();
-        typename T::SoaFloat b0 = shapeParams.GetB0();
-        typename T::SoaFloat b1 = shapeParams.GetB1();
-        typename T::SoaFloat b2 = shapeParams.GetB2();
-        typename T::SoaFloat b3 = shapeParams.GetB3();
-        typename T::SoaFloat c0 = shapeParams.GetC0();
-        typename T::SoaFloat c1 = shapeParams.GetC1();
-        typename T::SoaFloat c2 = shapeParams.GetC2();
-        typename T::SoaFloat c3 = shapeParams.GetC3();
-
-        typename T::SoaFloat x0 = unrotatedOffset0.x;
-        typename T::SoaFloat y0 = unrotatedOffset0.y;
-        typename T::SoaFloat z0 = unrotatedOffset0.z;
-        typename T::SoaFloat x1 = unrotatedOffset1.x;
-        typename T::SoaFloat y1 = unrotatedOffset1.y;
-        typename T::SoaFloat z1 = unrotatedOffset1.z;
-        typename T::SoaFloat x2 = unrotatedOffset2.x;
-        typename T::SoaFloat y2 = unrotatedOffset2.y;
-        typename T::SoaFloat z2 = unrotatedOffset2.z;
-        typename T::SoaFloat x3 = unrotatedOffset3.x;
-        typename T::SoaFloat y3 = unrotatedOffset3.y;
-        typename T::SoaFloat z3 = unrotatedOffset3.z;
-
-        strain[0].x = a3 * x3 + a2 * x2 + a1 * x1 + a0 * x0;
-        strain[0].y = b3 * y3 + b2 * y2 + b1 * y1 + b0 * y0;
-        strain[0].z = c3 * z3 + c2 * z2 + c1 * z1 + c0 * z0;
-        strain[1].x = a3 * y3 + a2 * y2 + a1 * y1 + a0 * y0 + b3 * x3 + b2 * x2 + b1 * x1 + b0 * x0;
-        strain[1].y = b3 * z3 + b2 * z2 + b1 * z1 + b0 * z0 + c3 * y3 + c2 * y2 + c1 * y1 + c0 * y0;
-        strain[1].z = a3 * z3 + a2 * z2 + a1 * z1 + a0 * z0 + c3 * x3 + c2 * x2 + c1 * x1 + c0 * x0;
+        const typename T::SoaVector3* offsets[4] = {&unrotatedOffset0, &unrotatedOffset1, &unrotatedOffset2, &unrotatedOffset3};
+        float bary[12][FmHighwayMaxLanes] = {};
+        float packedOffsets[12][FmHighwayMaxLanes] = {};
+        float result[6][FmHighwayMaxLanes] = {};
+        typename T::SoaFloat coefficients[12] = {shapeParams.GetA0(), shapeParams.GetA1(), shapeParams.GetA2(), shapeParams.GetA3(),
+            shapeParams.GetB0(), shapeParams.GetB1(), shapeParams.GetB2(), shapeParams.GetB3(),
+            shapeParams.GetC0(), shapeParams.GetC1(), shapeParams.GetC2(), shapeParams.GetC3()};
+        for (int i = 0; i < 12; ++i)
+            for (uint lane = 0; lane < T::width; ++lane) bary[i][lane] = coefficients[i].getSlice(lane);
+        for (int point = 0; point < 4; ++point)
+            for (int component = 0; component < 3; ++component)
+                for (uint lane = 0; lane < T::width; ++lane)
+                    packedOffsets[point * 3 + component][lane] =
+                        (component == 0 ? offsets[point]->x : component == 1 ? offsets[point]->y : offsets[point]->z).getSlice(lane);
+        FmHighwayComputeTetStrain(&bary[0][0], &packedOffsets[0][0], &result[0][0], T::width);
+        typename T::SoaFloat* output[6] = {&strain[0].x, &strain[0].y, &strain[0].z, &strain[1].x, &strain[1].y, &strain[1].z};
+        for (int i = 0; i < 6; ++i)
+            for (uint lane = 0; lane < T::width; ++lane) output[i]->setSlice(lane, result[i][lane]);
     }
 
     // Compute stress matrix from shape and material parameters
@@ -381,158 +313,70 @@ namespace AMD
         typename T::SoaFloat youngsModulus,
         typename T::SoaFloat poissonsRatio)
     {
-        typename T::SoaFloat a0 = baryMatrixCol0.x;
-        typename T::SoaFloat a1 = baryMatrixCol0.y;
-        typename T::SoaFloat a2 = baryMatrixCol0.z;
-        typename T::SoaFloat a3 = baryMatrixCol0.w;
-        typename T::SoaFloat b0 = baryMatrixCol1.x;
-        typename T::SoaFloat b1 = baryMatrixCol1.y;
-        typename T::SoaFloat b2 = baryMatrixCol1.z;
-        typename T::SoaFloat b3 = baryMatrixCol1.w;
-        typename T::SoaFloat c0 = baryMatrixCol2.x;
-        typename T::SoaFloat c1 = baryMatrixCol2.y;
-        typename T::SoaFloat c2 = baryMatrixCol2.z;
-        typename T::SoaFloat c3 = baryMatrixCol2.w;
-
-        typename T::SoaFloat scale = (youngsModulus / ((1.0f + poissonsRatio)*(1.0f - 2.0f * poissonsRatio)));
-
-        typename T::SoaFloat v0 = scale * (1.0f - poissonsRatio);
-        typename T::SoaFloat v1 = scale * poissonsRatio;
-        typename T::SoaFloat v2 = scale * (0.5f - poissonsRatio);
-
-        typename T::SoaFloat a0_v0 = a0 * v0;
-        typename T::SoaFloat a0_v1 = a0 * v1;
-        typename T::SoaFloat a0_v2 = a0 * v2;
-        typename T::SoaFloat a1_v0 = a1 * v0;
-        typename T::SoaFloat a1_v1 = a1 * v1;
-        typename T::SoaFloat a1_v2 = a1 * v2;
-        typename T::SoaFloat a2_v0 = a2 * v0;
-        typename T::SoaFloat a2_v1 = a2 * v1;
-        typename T::SoaFloat a2_v2 = a2 * v2;
-        typename T::SoaFloat a3_v0 = a3 * v0;
-        typename T::SoaFloat a3_v1 = a3 * v1;
-        typename T::SoaFloat a3_v2 = a3 * v2;
-        typename T::SoaFloat b0_v0 = b0 * v0;
-        typename T::SoaFloat b0_v1 = b0 * v1;
-        typename T::SoaFloat b0_v2 = b0 * v2;
-        typename T::SoaFloat b1_v0 = b1 * v0;
-        typename T::SoaFloat b1_v1 = b1 * v1;
-        typename T::SoaFloat b1_v2 = b1 * v2;
-        typename T::SoaFloat b2_v0 = b2 * v0;
-        typename T::SoaFloat b2_v1 = b2 * v1;
-        typename T::SoaFloat b2_v2 = b2 * v2;
-        typename T::SoaFloat b3_v0 = b3 * v0;
-        typename T::SoaFloat b3_v1 = b3 * v1;
-        typename T::SoaFloat b3_v2 = b3 * v2;
-        typename T::SoaFloat c0_v0 = c0 * v0;
-        typename T::SoaFloat c0_v1 = c0 * v1;
-        typename T::SoaFloat c0_v2 = c0 * v2;
-        typename T::SoaFloat c1_v0 = c1 * v0;
-        typename T::SoaFloat c1_v1 = c1 * v1;
-        typename T::SoaFloat c1_v2 = c1 * v2;
-        typename T::SoaFloat c2_v0 = c2 * v0;
-        typename T::SoaFloat c2_v1 = c2 * v1;
-        typename T::SoaFloat c2_v2 = c2 * v2;
-        typename T::SoaFloat c3_v0 = c3 * v0;
-        typename T::SoaFloat c3_v1 = c3 * v1;
-        typename T::SoaFloat c3_v2 = c3 * v2;
-
-        stressMat->EBe00 = typename T::SoaMatrix3(typename T::SoaVector3(a0_v0, a0_v1, a0_v1), typename T::SoaVector3(b0_v1, b0_v0, b0_v1), typename T::SoaVector3(c0_v1, c0_v1, c0_v0));
-        stressMat->EBe01 = typename T::SoaMatrix3(typename T::SoaVector3(a1_v0, a1_v1, a1_v1), typename T::SoaVector3(b1_v1, b1_v0, b1_v1), typename T::SoaVector3(c1_v1, c1_v1, c1_v0));
-        stressMat->EBe02 = typename T::SoaMatrix3(typename T::SoaVector3(a2_v0, a2_v1, a2_v1), typename T::SoaVector3(b2_v1, b2_v0, b2_v1), typename T::SoaVector3(c2_v1, c2_v1, c2_v0));
-        stressMat->EBe03 = typename T::SoaMatrix3(typename T::SoaVector3(a3_v0, a3_v1, a3_v1), typename T::SoaVector3(b3_v1, b3_v0, b3_v1), typename T::SoaVector3(c3_v1, c3_v1, c3_v0));
-        stressMat->EBe10 = typename T::SoaMatrix3(typename T::SoaVector3(b0_v2, 0.0f, c0_v2), typename T::SoaVector3(a0_v2, c0_v2, 0.0f), typename T::SoaVector3(0.0f, b0_v2, a0_v2));
-        stressMat->EBe11 = typename T::SoaMatrix3(typename T::SoaVector3(b1_v2, 0.0f, c1_v2), typename T::SoaVector3(a1_v2, c1_v2, 0.0f), typename T::SoaVector3(0.0f, b1_v2, a1_v2));
-        stressMat->EBe12 = typename T::SoaMatrix3(typename T::SoaVector3(b2_v2, 0.0f, c2_v2), typename T::SoaVector3(a2_v2, c2_v2, 0.0f), typename T::SoaVector3(0.0f, b2_v2, a2_v2));
-        stressMat->EBe13 = typename T::SoaMatrix3(typename T::SoaVector3(b3_v2, 0.0f, c3_v2), typename T::SoaVector3(a3_v2, c3_v2, 0.0f), typename T::SoaVector3(0.0f, b3_v2, a3_v2));
+        float bary[12][FmHighwayMaxLanes] = {};
+        float volume[FmHighwayMaxLanes] = {};
+        float young[FmHighwayMaxLanes] = {};
+        float poisson[FmHighwayMaxLanes] = {};
+        float stress[72][FmHighwayMaxLanes] = {};
+        float stiffness[90][FmHighwayMaxLanes] = {};
+        const typename T::SoaFloat* coefficients[12] = {
+            &baryMatrixCol0.x, &baryMatrixCol0.y, &baryMatrixCol0.z, &baryMatrixCol0.w,
+            &baryMatrixCol1.x, &baryMatrixCol1.y, &baryMatrixCol1.z, &baryMatrixCol1.w,
+            &baryMatrixCol2.x, &baryMatrixCol2.y, &baryMatrixCol2.z, &baryMatrixCol2.w};
+        for (int i = 0; i < 12; ++i)
+            for (uint lane = 0; lane < T::width; ++lane) bary[i][lane] = coefficients[i]->getSlice(lane);
+        for (uint lane = 0; lane < T::width; ++lane)
+        {
+            volume[lane] = 1.0f;
+            young[lane] = youngsModulus.getSlice(lane);
+            poisson[lane] = poissonsRatio.getSlice(lane);
+        }
+        FmHighwayComputeTetStressAndStiffness(&bary[0][0], volume, young, poisson,
+            &stress[0][0], &stiffness[0][0], T::width);
+        typename T::SoaMatrix3* output[8] = {&stressMat->EBe00, &stressMat->EBe01, &stressMat->EBe02, &stressMat->EBe03,
+            &stressMat->EBe10, &stressMat->EBe11, &stressMat->EBe12, &stressMat->EBe13};
+        for (int matrix = 0; matrix < 8; ++matrix)
+            FmUnpackSoaMatrix3<T>(output[matrix], &stress[matrix * 9]);
     }
 
     // Compute stress and stiffness matrix from shape and material parameters
     template<class T>
     void FmComputeTetStressAndStiffnessMatrix(
-        FmSoaTetStressMatrix<T>* stressMat, FmSoaTetStiffnessMatrix<T>* stiffnessMat, 
+        FmSoaTetStressMatrix<T>* stressMat, FmSoaTetStiffnessMatrix<T>* stiffnessMat,
         const typename T::SoaVector4& baryMatrixCol0,
         const typename T::SoaVector4& baryMatrixCol1,
         const typename T::SoaVector4& baryMatrixCol2,
-        typename T::SoaFloat volume,
-        typename T::SoaFloat youngsModulus,
+        typename T::SoaFloat volume, typename T::SoaFloat youngsModulus,
         typename T::SoaFloat poissonsRatio)
     {
-        typename T::SoaFloat a0 = baryMatrixCol0.x;
-        typename T::SoaFloat a1 = baryMatrixCol0.y;
-        typename T::SoaFloat a2 = baryMatrixCol0.z;
-        typename T::SoaFloat a3 = baryMatrixCol0.w;
-        typename T::SoaFloat b0 = baryMatrixCol1.x;
-        typename T::SoaFloat b1 = baryMatrixCol1.y;
-        typename T::SoaFloat b2 = baryMatrixCol1.z;
-        typename T::SoaFloat b3 = baryMatrixCol1.w;
-        typename T::SoaFloat c0 = baryMatrixCol2.x;
-        typename T::SoaFloat c1 = baryMatrixCol2.y;
-        typename T::SoaFloat c2 = baryMatrixCol2.z;
-        typename T::SoaFloat c3 = baryMatrixCol2.w;
-
-        typename T::SoaFloat scale = (youngsModulus / ((1.0f + poissonsRatio)*(1.0f - 2.0f * poissonsRatio)));
-
-        typename T::SoaFloat v0 = scale * (1.0f - poissonsRatio);
-        typename T::SoaFloat v1 = scale * poissonsRatio;
-        typename T::SoaFloat v2 = scale * (0.5f - poissonsRatio);
-
-        typename T::SoaFloat a0_v0 = a0*v0;
-        typename T::SoaFloat a0_v1 = a0*v1;
-        typename T::SoaFloat a0_v2 = a0*v2;
-        typename T::SoaFloat a1_v0 = a1*v0;
-        typename T::SoaFloat a1_v1 = a1*v1;
-        typename T::SoaFloat a1_v2 = a1*v2;
-        typename T::SoaFloat a2_v0 = a2*v0;
-        typename T::SoaFloat a2_v1 = a2*v1;
-        typename T::SoaFloat a2_v2 = a2*v2;
-        typename T::SoaFloat a3_v0 = a3*v0;
-        typename T::SoaFloat a3_v1 = a3*v1;
-        typename T::SoaFloat a3_v2 = a3*v2;
-        typename T::SoaFloat b0_v0 = b0*v0;
-        typename T::SoaFloat b0_v1 = b0*v1;
-        typename T::SoaFloat b0_v2 = b0*v2;
-        typename T::SoaFloat b1_v0 = b1*v0;
-        typename T::SoaFloat b1_v1 = b1*v1;
-        typename T::SoaFloat b1_v2 = b1*v2;
-        typename T::SoaFloat b2_v0 = b2*v0;
-        typename T::SoaFloat b2_v1 = b2*v1;
-        typename T::SoaFloat b2_v2 = b2*v2;
-        typename T::SoaFloat b3_v0 = b3*v0;
-        typename T::SoaFloat b3_v1 = b3*v1;
-        typename T::SoaFloat b3_v2 = b3*v2;
-        typename T::SoaFloat c0_v0 = c0*v0;
-        typename T::SoaFloat c0_v1 = c0*v1;
-        typename T::SoaFloat c0_v2 = c0*v2;
-        typename T::SoaFloat c1_v0 = c1*v0;
-        typename T::SoaFloat c1_v1 = c1*v1;
-        typename T::SoaFloat c1_v2 = c1*v2;
-        typename T::SoaFloat c2_v0 = c2*v0;
-        typename T::SoaFloat c2_v1 = c2*v1;
-        typename T::SoaFloat c2_v2 = c2*v2;
-        typename T::SoaFloat c3_v0 = c3*v0;
-        typename T::SoaFloat c3_v1 = c3*v1;
-        typename T::SoaFloat c3_v2 = c3*v2;
-
-        stressMat->EBe00 = typename T::SoaMatrix3(typename T::SoaVector3(a0_v0, a0_v1, a0_v1), typename T::SoaVector3(b0_v1, b0_v0, b0_v1), typename T::SoaVector3(c0_v1, c0_v1, c0_v0));
-        stressMat->EBe01 = typename T::SoaMatrix3(typename T::SoaVector3(a1_v0, a1_v1, a1_v1), typename T::SoaVector3(b1_v1, b1_v0, b1_v1), typename T::SoaVector3(c1_v1, c1_v1, c1_v0));
-        stressMat->EBe02 = typename T::SoaMatrix3(typename T::SoaVector3(a2_v0, a2_v1, a2_v1), typename T::SoaVector3(b2_v1, b2_v0, b2_v1), typename T::SoaVector3(c2_v1, c2_v1, c2_v0));
-        stressMat->EBe03 = typename T::SoaMatrix3(typename T::SoaVector3(a3_v0, a3_v1, a3_v1), typename T::SoaVector3(b3_v1, b3_v0, b3_v1), typename T::SoaVector3(c3_v1, c3_v1, c3_v0));
-        stressMat->EBe10 = typename T::SoaMatrix3(typename T::SoaVector3(b0_v2, 0.0f, c0_v2), typename T::SoaVector3(a0_v2, c0_v2, 0.0f), typename T::SoaVector3(0.0f, b0_v2, a0_v2));
-        stressMat->EBe11 = typename T::SoaMatrix3(typename T::SoaVector3(b1_v2, 0.0f, c1_v2), typename T::SoaVector3(a1_v2, c1_v2, 0.0f), typename T::SoaVector3(0.0f, b1_v2, a1_v2));
-        stressMat->EBe12 = typename T::SoaMatrix3(typename T::SoaVector3(b2_v2, 0.0f, c2_v2), typename T::SoaVector3(a2_v2, c2_v2, 0.0f), typename T::SoaVector3(0.0f, b2_v2, a2_v2));
-        stressMat->EBe13 = typename T::SoaMatrix3(typename T::SoaVector3(b3_v2, 0.0f, c3_v2), typename T::SoaVector3(a3_v2, c3_v2, 0.0f), typename T::SoaVector3(0.0f, b3_v2, a3_v2));
-
-        stiffnessMat->Ke_diag0 = volume * typename T::SoaMatrix3(typename T::SoaVector3(c0*c0_v2 + b0*b0_v2 + a0*a0_v0, a0*b0_v2 + a0*b0_v1, a0*c0_v2 + a0*c0_v1), typename T::SoaVector3(a0*b0_v2 + a0*b0_v1, c0*c0_v2 + a0*a0_v2 + b0*b0_v0, b0*c0_v2 + b0*c0_v1), typename T::SoaVector3(a0*c0_v2 + a0*c0_v1, b0*c0_v2 + b0*c0_v1, b0*b0_v2 + a0*a0_v2 + c0*c0_v0));
-        stiffnessMat->Ke_diag1 = volume * typename T::SoaMatrix3(typename T::SoaVector3(c1*c1_v2 + b1*b1_v2 + a1*a1_v0, a1*b1_v2 + a1*b1_v1, a1*c1_v2 + a1*c1_v1), typename T::SoaVector3(a1*b1_v2 + a1*b1_v1, c1*c1_v2 + a1*a1_v2 + b1*b1_v0, b1*c1_v2 + b1*c1_v1), typename T::SoaVector3(a1*c1_v2 + a1*c1_v1, b1*c1_v2 + b1*c1_v1, b1*b1_v2 + a1*a1_v2 + c1*c1_v0));
-        stiffnessMat->Ke_diag2 = volume * typename T::SoaMatrix3(typename T::SoaVector3(c2*c2_v2 + b2*b2_v2 + a2*a2_v0, a2*b2_v2 + a2*b2_v1, a2*c2_v2 + a2*c2_v1), typename T::SoaVector3(a2*b2_v2 + a2*b2_v1, c2*c2_v2 + a2*a2_v2 + b2*b2_v0, b2*c2_v2 + b2*c2_v1), typename T::SoaVector3(a2*c2_v2 + a2*c2_v1, b2*c2_v2 + b2*c2_v1, b2*b2_v2 + a2*a2_v2 + c2*c2_v0));
-        stiffnessMat->Ke_diag3 = volume * typename T::SoaMatrix3(typename T::SoaVector3(c3*c3_v2 + b3*b3_v2 + a3*a3_v0, a3*b3_v2 + a3*b3_v1, a3*c3_v2 + a3*c3_v1), typename T::SoaVector3(a3*b3_v2 + a3*b3_v1, c3*c3_v2 + a3*a3_v2 + b3*b3_v0, b3*c3_v2 + b3*c3_v1), typename T::SoaVector3(a3*c3_v2 + a3*c3_v1, b3*c3_v2 + b3*c3_v1, b3*b3_v2 + a3*a3_v2 + c3*c3_v0));
-        stiffnessMat->Ke_lower0 = volume * typename T::SoaMatrix3(typename T::SoaVector3(c0*c1_v2 + b0*b1_v2 + a0*a1_v0, a1*b0_v2 + a0*b1_v1, a1*c0_v2 + a0*c1_v1), typename T::SoaVector3(a0*b1_v2 + a1*b0_v1, c0*c1_v2 + a0*a1_v2 + b0*b1_v0, b1*c0_v2 + b0*c1_v1), typename T::SoaVector3(a0*c1_v2 + a1*c0_v1, b0*c1_v2 + b1*c0_v1, b0*b1_v2 + a0*a1_v2 + c0*c1_v0));
-        stiffnessMat->Ke_lower1 = volume * typename T::SoaMatrix3(typename T::SoaVector3(c0*c2_v2 + b0*b2_v2 + a0*a2_v0, a2*b0_v2 + a0*b2_v1, a2*c0_v2 + a0*c2_v1), typename T::SoaVector3(a0*b2_v2 + a2*b0_v1, c0*c2_v2 + a0*a2_v2 + b0*b2_v0, b2*c0_v2 + b0*c2_v1), typename T::SoaVector3(a0*c2_v2 + a2*c0_v1, b0*c2_v2 + b2*c0_v1, b0*b2_v2 + a0*a2_v2 + c0*c2_v0));
-        stiffnessMat->Ke_lower2 = volume * typename T::SoaMatrix3(typename T::SoaVector3(c0*c3_v2 + b0*b3_v2 + a0*a3_v0, a3*b0_v2 + a0*b3_v1, a3*c0_v2 + a0*c3_v1), typename T::SoaVector3(a0*b3_v2 + a3*b0_v1, c0*c3_v2 + a0*a3_v2 + b0*b3_v0, b3*c0_v2 + b0*c3_v1), typename T::SoaVector3(a0*c3_v2 + a3*c0_v1, b0*c3_v2 + b3*c0_v1, b0*b3_v2 + a0*a3_v2 + c0*c3_v0));
-        stiffnessMat->Ke_lower3 = volume * typename T::SoaMatrix3(typename T::SoaVector3(c1*c2_v2 + b1*b2_v2 + a1*a2_v0, a2*b1_v2 + a1*b2_v1, a2*c1_v2 + a1*c2_v1), typename T::SoaVector3(a1*b2_v2 + a2*b1_v1, c1*c2_v2 + a1*a2_v2 + b1*b2_v0, b2*c1_v2 + b1*c2_v1), typename T::SoaVector3(a1*c2_v2 + a2*c1_v1, b1*c2_v2 + b2*c1_v1, b1*b2_v2 + a1*a2_v2 + c1*c2_v0));
-        stiffnessMat->Ke_lower4 = volume * typename T::SoaMatrix3(typename T::SoaVector3(c1*c3_v2 + b1*b3_v2 + a1*a3_v0, a3*b1_v2 + a1*b3_v1, a3*c1_v2 + a1*c3_v1), typename T::SoaVector3(a1*b3_v2 + a3*b1_v1, c1*c3_v2 + a1*a3_v2 + b1*b3_v0, b3*c1_v2 + b1*c3_v1), typename T::SoaVector3(a1*c3_v2 + a3*c1_v1, b1*c3_v2 + b3*c1_v1, b1*b3_v2 + a1*a3_v2 + c1*c3_v0));
-        stiffnessMat->Ke_lower5 = volume * typename T::SoaMatrix3(typename T::SoaVector3(c2*c3_v2 + b2*b3_v2 + a2*a3_v0, a3*b2_v2 + a2*b3_v1, a3*c2_v2 + a2*c3_v1), typename T::SoaVector3(a2*b3_v2 + a3*b2_v1, c2*c3_v2 + a2*a3_v2 + b2*b3_v0, b3*c2_v2 + b2*c3_v1), typename T::SoaVector3(a2*c3_v2 + a3*c2_v1, b2*c3_v2 + b3*c2_v1, b2*b3_v2 + a2*a3_v2 + c2*c3_v0));
+        float bary[12][FmHighwayMaxLanes] = {};
+        float volumePacked[FmHighwayMaxLanes] = {};
+        float young[FmHighwayMaxLanes] = {};
+        float poisson[FmHighwayMaxLanes] = {};
+        float stress[72][FmHighwayMaxLanes] = {};
+        float stiffness[90][FmHighwayMaxLanes] = {};
+        const typename T::SoaFloat* coefficients[12] = {
+            &baryMatrixCol0.x, &baryMatrixCol0.y, &baryMatrixCol0.z, &baryMatrixCol0.w,
+            &baryMatrixCol1.x, &baryMatrixCol1.y, &baryMatrixCol1.z, &baryMatrixCol1.w,
+            &baryMatrixCol2.x, &baryMatrixCol2.y, &baryMatrixCol2.z, &baryMatrixCol2.w};
+        for (int i = 0; i < 12; ++i)
+            for (uint lane = 0; lane < T::width; ++lane) bary[i][lane] = coefficients[i]->getSlice(lane);
+        for (uint lane = 0; lane < T::width; ++lane)
+        {
+            volumePacked[lane] = volume.getSlice(lane);
+            young[lane] = youngsModulus.getSlice(lane);
+            poisson[lane] = poissonsRatio.getSlice(lane);
+        }
+        FmHighwayComputeTetStressAndStiffness(&bary[0][0], volumePacked, young, poisson,
+            &stress[0][0], &stiffness[0][0], T::width);
+        typename T::SoaMatrix3* stressOutput[8] = {&stressMat->EBe00, &stressMat->EBe01, &stressMat->EBe02, &stressMat->EBe03,
+            &stressMat->EBe10, &stressMat->EBe11, &stressMat->EBe12, &stressMat->EBe13};
+        typename T::SoaMatrix3* stiffnessOutput[10] = {&stiffnessMat->Ke_diag0, &stiffnessMat->Ke_diag1, &stiffnessMat->Ke_diag2, &stiffnessMat->Ke_diag3,
+            &stiffnessMat->Ke_lower0, &stiffnessMat->Ke_lower1, &stiffnessMat->Ke_lower2, &stiffnessMat->Ke_lower3, &stiffnessMat->Ke_lower4, &stiffnessMat->Ke_lower5};
+        for (int matrix = 0; matrix < 8; ++matrix)
+            FmUnpackSoaMatrix3<T>(stressOutput[matrix], &stress[matrix * 9]);
+        for (int matrix = 0; matrix < 10; ++matrix)
+            FmUnpackSoaMatrix3<T>(stiffnessOutput[matrix], &stiffness[matrix * 9]);
     }
 
     template<class T>
@@ -545,49 +389,28 @@ namespace AMD
         const typename T::SoaVector3& tetRestPosition3,
         const typename T::SoaMatrix3& tetRotation)
     {
-        typename T::SoaMatrix3 ReKe[4][4];
-
-        typename T::SoaMatrix3 tetRotationInv = transpose(tetRotation);
-
-        ReKe[0][0] = mul(tetRotation, stiffnessMat.Ke_diag0);
-        ReKe[0][1] = mul(tetRotation, transpose(stiffnessMat.Ke_lower0));
-        ReKe[0][2] = mul(tetRotation, transpose(stiffnessMat.Ke_lower1));
-        ReKe[0][3] = mul(tetRotation, transpose(stiffnessMat.Ke_lower2));
-        ReKe[1][0] = mul(tetRotation, stiffnessMat.Ke_lower0);
-        ReKe[1][1] = mul(tetRotation, stiffnessMat.Ke_diag1);
-        ReKe[1][2] = mul(tetRotation, transpose(stiffnessMat.Ke_lower3));
-        ReKe[1][3] = mul(tetRotation, transpose(stiffnessMat.Ke_lower4));
-        ReKe[2][0] = mul(tetRotation, stiffnessMat.Ke_lower1);
-        ReKe[2][1] = mul(tetRotation, stiffnessMat.Ke_lower3);
-        ReKe[2][2] = mul(tetRotation, stiffnessMat.Ke_diag2);
-        ReKe[2][3] = mul(tetRotation, transpose(stiffnessMat.Ke_lower5));
-        ReKe[3][0] = mul(tetRotation, stiffnessMat.Ke_lower2);
-        ReKe[3][1] = mul(tetRotation, stiffnessMat.Ke_lower4);
-        ReKe[3][2] = mul(tetRotation, stiffnessMat.Ke_lower5);
-        ReKe[3][3] = mul(tetRotation, stiffnessMat.Ke_diag3);
-
-        typename T::SoaVector3 vec0 = -tetRestPosition0;
-        typename T::SoaVector3 vec1 = -tetRestPosition1;
-        typename T::SoaVector3 vec2 = -tetRestPosition2;
-        typename T::SoaVector3 vec3 = -tetRestPosition3;
-
-        rotatedStiffnessMat->f0eprime0 = mul(ReKe[0][0], vec0) + mul(ReKe[0][1], vec1) + mul(ReKe[0][2], vec2) + mul(ReKe[0][3], vec3);
-        rotatedStiffnessMat->f0eprime1 = mul(ReKe[1][0], vec0) + mul(ReKe[1][1], vec1) + mul(ReKe[1][2], vec2) + mul(ReKe[1][3], vec3);
-        rotatedStiffnessMat->f0eprime2 = mul(ReKe[2][0], vec0) + mul(ReKe[2][1], vec1) + mul(ReKe[2][2], vec2) + mul(ReKe[2][3], vec3);
-        rotatedStiffnessMat->f0eprime3 = mul(ReKe[3][0], vec0) + mul(ReKe[3][1], vec1) + mul(ReKe[3][2], vec2) + mul(ReKe[3][3], vec3);
-
-        rotatedStiffnessMat->Keprime_diag0 = mul(ReKe[0][0], tetRotationInv);
-        rotatedStiffnessMat->Keprime_lower0 = mul(ReKe[1][0], tetRotationInv);
-        rotatedStiffnessMat->Keprime_lower1 = mul(ReKe[2][0], tetRotationInv);
-        rotatedStiffnessMat->Keprime_lower2 = mul(ReKe[3][0], tetRotationInv);
-        rotatedStiffnessMat->Keprime_diag1 = mul(ReKe[1][1], tetRotationInv);
-        rotatedStiffnessMat->Keprime_lower3 = mul(ReKe[2][1], tetRotationInv);
-        rotatedStiffnessMat->Keprime_lower4 = mul(ReKe[3][1], tetRotationInv);
-
-        rotatedStiffnessMat->Keprime_diag2 = mul(ReKe[2][2], tetRotationInv);
-        rotatedStiffnessMat->Keprime_lower5 = mul(ReKe[3][2], tetRotationInv);
-
-        rotatedStiffnessMat->Keprime_diag3 = mul(ReKe[3][3], tetRotationInv);
+        float stiffness[90][FmHighwayMaxLanes] = {};
+        float positions[12][FmHighwayMaxLanes] = {};
+        float rotation[9][FmHighwayMaxLanes] = {};
+        float rotated[90][FmHighwayMaxLanes] = {};
+        float force[12][FmHighwayMaxLanes] = {};
+        const typename T::SoaMatrix3* inputMatrices[10] = {&stiffnessMat.Ke_diag0, &stiffnessMat.Ke_diag1, &stiffnessMat.Ke_diag2, &stiffnessMat.Ke_diag3,
+            &stiffnessMat.Ke_lower0, &stiffnessMat.Ke_lower1, &stiffnessMat.Ke_lower2, &stiffnessMat.Ke_lower3, &stiffnessMat.Ke_lower4, &stiffnessMat.Ke_lower5};
+        for (int matrix = 0; matrix < 10; ++matrix)
+            FmPackSoaMatrix3<T>(&stiffness[matrix * 9], *inputMatrices[matrix]);
+        const typename T::SoaVector3* inputPositions[4] = {&tetRestPosition0, &tetRestPosition1, &tetRestPosition2, &tetRestPosition3};
+        for (int point = 0; point < 4; ++point)
+            FmPackSoaVector3<T>(&positions[point * 3], *inputPositions[point]);
+        FmPackSoaMatrix3<T>(rotation, tetRotation);
+        FmHighwayComputeRotatedStiffness(&stiffness[0][0], &positions[0][0], &rotation[0][0],
+            &rotated[0][0], &force[0][0], T::width);
+        typename T::SoaMatrix3* outputMatrices[10] = {&rotatedStiffnessMat->Keprime_diag0, &rotatedStiffnessMat->Keprime_diag1, &rotatedStiffnessMat->Keprime_diag2, &rotatedStiffnessMat->Keprime_diag3,
+            &rotatedStiffnessMat->Keprime_lower0, &rotatedStiffnessMat->Keprime_lower1, &rotatedStiffnessMat->Keprime_lower2, &rotatedStiffnessMat->Keprime_lower3, &rotatedStiffnessMat->Keprime_lower4, &rotatedStiffnessMat->Keprime_lower5};
+        typename T::SoaVector3* outputForces[4] = {&rotatedStiffnessMat->f0eprime0, &rotatedStiffnessMat->f0eprime1, &rotatedStiffnessMat->f0eprime2, &rotatedStiffnessMat->f0eprime3};
+        for (int matrix = 0; matrix < 10; ++matrix)
+            FmUnpackSoaMatrix3<T>(outputMatrices[matrix], &rotated[matrix * 9]);
+        for (int point = 0; point < 4; ++point)
+            FmUnpackSoaVector3<T>(outputForces[point], &force[point * 3]);
     }
 
     template<class T>

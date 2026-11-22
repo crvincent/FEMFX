@@ -356,15 +356,8 @@ namespace FmVectormath {
         VECTORMATH_FORCE_INLINE const Matrix3 Matrix3::rotation(float radians, const Vector3 & unitVec)
         {
             float x, y, z, s, c, oneMinusC, xy, yz, zx;
-#if 1 && !defined(FEMFX_SIMD_SCALAR)
-            __m128 msin, mcos;
-            simd_sincos_ps(_mm_set1_ps(radians), &msin, &mcos);
-            s = simd_getx_ps(msin);
-            c = simd_getx_ps(mcos);
-#else
             s = sinf(radians);
             c = cosf(radians);
-#endif
             x = unitVec.getX();
             y = unitVec.getY();
             z = unitVec.getZ();

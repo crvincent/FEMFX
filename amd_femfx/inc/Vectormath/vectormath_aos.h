@@ -194,19 +194,19 @@ VECTORMATH_FORCE_INLINE const Vector3 operator /( const Vector3 & vec0, const Ve
 
 // Compute the reciprocal of a 3-D vector per element
 // NOTE: 
-// Floating-point behavior matches standard library function _mm_rcp_ps.
+// Floating-point reciprocal behavior follows the standard approximation policy.
 // 
 VECTORMATH_FORCE_INLINE const Vector3 inv( const Vector3 & vec );
 
 // Compute the square root of a 3-D vector per element
 // NOTE: 
-// Floating-point behavior matches standard library function _mm_sqrt_ps.
+// Floating-point square-root behavior follows the platform math implementation.
 // 
 VECTORMATH_FORCE_INLINE const Vector3 sqrt( const Vector3 & vec );
 
 // Compute the reciprocal square root of a 3-D vector per element
 // NOTE: 
-// Floating-point behavior matches standard library function _mm_rsqrt_ps.
+// Floating-point reciprocal-square-root behavior follows the platform implementation.
 // 
 VECTORMATH_FORCE_INLINE const Vector3 rsqrt( const Vector3 & vec );
 
@@ -503,19 +503,19 @@ VECTORMATH_FORCE_INLINE const Vector4 operator /( const Vector4 & vec0, const Ve
 
 // Compute the reciprocal of a 4-D vector per element
 // NOTE: 
-// Floating-point behavior matches standard library function _mm_rcp_ps.
+// Floating-point reciprocal behavior follows the standard approximation policy.
 // 
 VECTORMATH_FORCE_INLINE const Vector4 inv( const Vector4 & vec );
 
 // Compute the square root of a 4-D vector per element
 // NOTE: 
-// Floating-point behavior matches standard library function _mm_sqrt_ps.
+// Floating-point square-root behavior follows the platform math implementation.
 // 
 VECTORMATH_FORCE_INLINE const Vector4 sqrt( const Vector4 & vec );
 
 // Compute the reciprocal square root of a 4-D vector per element
 // NOTE: 
-// Floating-point behavior matches standard library function _mm_rsqrt_ps.
+// Floating-point reciprocal-square-root behavior follows the platform implementation.
 // 
 VECTORMATH_FORCE_INLINE const Vector4 rsqrt( const Vector4 & vec );
 
@@ -723,19 +723,19 @@ VECTORMATH_FORCE_INLINE const Point3 operator /( const Point3 & pnt0, const Poin
 
 // Compute the reciprocal of a 3-D point per element
 // NOTE: 
-// Floating-point behavior matches standard library function _mm_rcp_ps.
+// Floating-point reciprocal behavior follows the standard approximation policy.
 // 
 VECTORMATH_FORCE_INLINE const Point3 inv( const Point3 & pnt );
 
 // Compute the square root of a 3-D point per element
 // NOTE: 
-// Floating-point behavior matches standard library function _mm_sqrt_ps.
+// Floating-point square-root behavior follows the platform math implementation.
 // 
 VECTORMATH_FORCE_INLINE const Point3 sqrt( const Point3 & pnt );
 
 // Compute the reciprocal square root of a 3-D point per element
 // NOTE: 
-// Floating-point behavior matches standard library function _mm_rsqrt_ps.
+// Floating-point reciprocal-square-root behavior follows the platform implementation.
 // 
 VECTORMATH_FORCE_INLINE const Point3 rsqrt( const Point3 & pnt );
 

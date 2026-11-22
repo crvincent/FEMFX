@@ -1,6 +1,23 @@
 AMD FEMFX
 v0.1.0
 
+## Licensing
+
+FEMFX, its bundled components, and the Google Highway submodule are governed
+by separate licenses:
+
+| Component | License | Location |
+| --- | --- | --- |
+| FEMFX | MIT | `LICENSE.txt` |
+| Sony Vectormath and other bundled third-party components | See component notice | `NOTICES.txt` |
+| Google Highway submodule | Apache-2.0 or BSD-3-Clause, at the user's choice | `highway/LICENSE` |
+
+Linking FEMFX into an application does not remove the redistribution
+requirements of any component included in the resulting build. Preserve
+`LICENSE.txt`, `NOTICES.txt`, the Highway license, and any component-specific
+headers in source or binary distributions as required by the applicable
+licenses.
+
 FEMFX is a multithreaded CPU library for deformable material physics, using 
 the Finite Element Method (FEM).  Solid objects are represented as a mesh of 
 tetrahedral elements, and each element has material parameters that control 
