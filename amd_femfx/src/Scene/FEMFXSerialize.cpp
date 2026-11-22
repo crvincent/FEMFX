@@ -644,7 +644,12 @@ namespace AMD
         size_t sceneTetMeshBuffersSize = FmGetSceneSerializedTetMeshBufferSize(scene);
         size_t sceneRigidBodiesSize = FmGetSceneSerializedRigidBodiesSize(scene);
         size_t sceneConstraintsSize = FmGetSceneSerializedConstraintsSize(scene);
-        size_t sceneSize = FM_PAD_64(sizeof(FmSerializedSceneCounts) + sceneTetMeshBuffersSize + sceneRigidBodiesSize + sceneConstraintsSize);
+        size_t sceneSize = FM_PAD_64(
+            sizeof(FmSerializedSceneCounts)
+            + sizeof(FmSceneControlParams)
+            + sceneTetMeshBuffersSize
+            + sceneRigidBodiesSize
+            + sceneConstraintsSize);
 
         *serializationBufferSize = sceneSize;
 
