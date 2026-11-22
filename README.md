@@ -39,61 +39,7 @@ physics.  The system is designed with the following considerations:
 The library uses extensive multithreading to utilize multicore CPUs and benefit 
 from the trend of increasing CPU core counts.
 
-Included in this release
-* Source code for FEMFX library
-* Houdini plugin for content creation
-* Sample code for loading and preprocessing content for rendering
-* Sample threading utilities
-* A basic graphical sample
-
-In a separate release, we provide a plugin for Unreal Engine that
-demonstrates more advanced rendering of FEM objects. Instructions for access are here: https://github.com/GPUOpen-LibrariesAndSDKs/GameEngineIntegrations
-* Plugin: https://github.com/GPUOpenSoftware/UnrealEngine/tree/FEMFX-4.18
-* Demo: https://github.com/GPUOpenSoftware/UnrealEngine/tree/FEMFX-AlienPods
-
-Dependencies
-The sample code has some dependencies on external frameworks which must be 
-downloaded separately:
-* JSON for Modern C++: https://github.com/nlohmann/json
-* GLFW: https://www.glfw.org/download.html
-
 System requirements
 * AMD Ryzen™ 7 2700X Processor or equivalent
 * Windows® 10
 * Visual Studio 2017 or Visual Studio 2019
-
-Files:
-1. Documentation
-   * amd_femfx\docs\
-2. Library
-   * amd_femfx\inc\ : Public API (Look first at AMD_FEMFX.h)
-   * amd_femfx\src\ : Implementation files
-3. Sample code
-   * samples\FEMFXViewer\ : Basic sample; displays tetrahedral meshes and debug 
-     information
-   * samples\common\TestScenes.*: Setup for tech demo scenes used by FEMFXViewer
-   * samples\common\FemResource.* : Container for the data loaded from a .FEM 
-     file
-   * samples\common\LoadFem.*: Code for parsing a .FEM and loading into an 
-     FEMResource
-   * samples\common\RenderTetAssignment.* : Assigns rendering mesh vertices to 
-     tetrahedra for skinning
-   * samples\ExampleRigidBodies\ : Basic demonstration of interfacing an 
-     external rigid body system with FEMFX library
-   * samples\sample_task_system\ : Sample task system library interfaced with 
-     FEMFX 
-4. Houdini plugin for content creation
-   * houdini16.5\AMD_FEM_Assets.otl
-5. External dependencies
-   * external\glfw\ : Path to install GLFW for viewer; can download Windows 
-     pre-compiled binaries from https://www.glfw.org/download.html
-   * external\json-develop\ : Path to install json parser used in LoadFemFile.*; 
-     can download from https://github.com/nlohmann/json
-6. Some individual components
-   * amd_femfx\inc\Vectormath\ : 3D vector/matrix math
-   * amd_femfx\src\PrimitiveCollision\ : Triangle and box collision 
-     operations, intersection and CCD
-   * amd_femfx\src\Common\FEMFXSvd3x3.* : 3x3 SVD
-   * amd_femfx\src\Threading\ : Async parallel-for and task graph support
-   * samples\sample_task_system\TL* : Async task system implementation
-
