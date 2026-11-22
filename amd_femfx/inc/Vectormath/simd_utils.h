@@ -26,23 +26,125 @@ THE SOFTWARE.
 
 #include <stdint.h>
 #include <math.h>
+// FEMFX SIMD backend selection.  Consumers may select a backend explicitly:
+//   FEMFX_SIMD_SCALAR, FEMFX_SIMD_SSE2, FEMFX_SIMD_AVX2, or FEMFX_SIMD_NEON.
+// Define exactly one before including any FEMFX vectormath header.
+#if !defined(FEMFX_SIMD_SCALAR) && !defined(FEMFX_SIMD_SSE2) && \
+    !defined(FEMFX_SIMD_AVX2) && !defined(FEMFX_SIMD_NEON)
+#if defined(__AVX2__) || (defined(_MSC_VER) && defined(__AVX2__))
+#define FEMFX_SIMD_AVX2 1
+#elif defined(__SSE2__) || defined(_M_X64) || defined(_M_AMD64) || defined(_M_IX86)
+#define FEMFX_SIMD_SSE2 1
+#else
+#define FEMFX_SIMD_SCALAR 1
+#endif
+#endif
+
+#if defined(FEMFX_SIMD_SCALAR)
+
+#include <stdint.h>
+#include <math.h>
+
+#define SIMD_UTILS_USE_SSE3 0
+#define SIMD_UTILS_USE_SSE4 0
+#define SIMD_UTILS_USE_FMA  0
+#define SIMD_UTILS_USE_AVX  0
+
+#define SIMD_UTILS_ALIGN16
+#if (defined(_WIN32) && defined(_MSC_VER))
+#define SIMD_UTILS_FORCE_INLINE __forceinline
+#else
+#define SIMD_UTILS_FORCE_INLINE inline
+#endif
+
+struct FEMFXScalar128
+{
+    float f[4];
+    FEMFXScalar128() {}
+    FEMFXScalar128(float x0, float x1, float x2, float x3) { f[0]=x0; f[1]=x1; f[2]=x2; f[3]=x3; }
+};
+
+struct FEMFXScalar128i
+{
+    int32_t i[4];
+    FEMFXScalar128i() {}
+    FEMFXScalar128i(int32_t x0, int32_t x1, int32_t x2, int32_t x3) { i[0]=x0; i[1]=x1; i[2]=x2; i[3]=x3; }
+};
+
+typedef FEMFXScalar128  FmSimdFloat128;
+typedef FEMFXScalar128i FmSimdInt128;
+
+union Simd128Union
+{
+    FmSimdInt128 vi;
+    FmSimdFloat128 vf;
+    int32_t i[4];
+    float f[4];
+    Simd128Union() {}
+};
+
+static SIMD_UTILS_FORCE_INLINE float simd_getx_ps(FmSimdFloat128 m) { return m.f[0]; }
+static SIMD_UTILS_FORCE_INLINE float simd_gety_ps(FmSimdFloat128 m) { return m.f[1]; }
+static SIMD_UTILS_FORCE_INLINE float simd_getz_ps(FmSimdFloat128 m) { return m.f[2]; }
+static SIMD_UTILS_FORCE_INLINE float simd_getw_ps(FmSimdFloat128 m) { return m.f[3]; }
+static SIMD_UTILS_FORCE_INLINE float simd_getelem_ps(FmSimdFloat128 m, int idx) { return m.f[idx & 3]; }
+static SIMD_UTILS_FORCE_INLINE int32_t simd_getelem_epi32(FmSimdInt128 m, int idx) { return m.i[idx & 3]; }
+static SIMD_UTILS_FORCE_INLINE FmSimdFloat128 simd_shuffle_xyxy(FmSimdFloat128 a, FmSimdFloat128 b) { return FmSimdFloat128(a.f[0],a.f[1],b.f[0],b.f[1]); }
+static SIMD_UTILS_FORCE_INLINE FmSimdFloat128 simd_shuffle_yzyz(FmSimdFloat128 a, FmSimdFloat128 b) { return FmSimdFloat128(a.f[1],a.f[2],b.f[1],b.f[2]); }
+static SIMD_UTILS_FORCE_INLINE FmSimdFloat128 simd_shuffle_zxzx(FmSimdFloat128 a, FmSimdFloat128 b) { return FmSimdFloat128(a.f[2],a.f[0],b.f[2],b.f[0]); }
+static SIMD_UTILS_FORCE_INLINE void simd_set_soa_vec3(FmSimdFloat128* x, FmSimdFloat128* y, FmSimdFloat128* z, float* aosvec3s)
+{
+    *x = FmSimdFloat128(aosvec3s[0],aosvec3s[3],aosvec3s[6],aosvec3s[9]);
+    *y = FmSimdFloat128(aosvec3s[1],aosvec3s[4],aosvec3s[7],aosvec3s[10]);
+    *z = FmSimdFloat128(aosvec3s[2],aosvec3s[5],aosvec3s[8],aosvec3s[11]);
+}
+static SIMD_UTILS_FORCE_INLINE void simd_set_soa_vec4(FmSimdFloat128* x, FmSimdFloat128* y, FmSimdFloat128* z, FmSimdFloat128* w, float* aosvec4s)
+{
+    *x = FmSimdFloat128(aosvec4s[0],aosvec4s[4],aosvec4s[8],aosvec4s[12]);
+    *y = FmSimdFloat128(aosvec4s[1],aosvec4s[5],aosvec4s[9],aosvec4s[13]);
+    *z = FmSimdFloat128(aosvec4s[2],aosvec4s[6],aosvec4s[10],aosvec4s[14]);
+    *w = FmSimdFloat128(aosvec4s[3],aosvec4s[7],aosvec4s[11],aosvec4s[15]);
+}
+
+#else
+
 #include <xmmintrin.h>
 #include <emmintrin.h>
-#include <immintrin.h>
 #include <pmmintrin.h>
+#if defined(FEMFX_SIMD_AVX2)
+#include <immintrin.h>
+#endif
 
+typedef __m128  FmSimdFloat128;
+typedef __m128i FmSimdInt128;
+
+#if defined(FEMFX_SIMD_AVX2)
 #define SIMD_UTILS_USE_SSE3 1
 #define SIMD_UTILS_USE_SSE4 1
 #define SIMD_UTILS_USE_FMA  1
-#define SIMD_UTILS_USE_AVX  1
+#else
+#define SIMD_UTILS_USE_SSE3 0
+#define SIMD_UTILS_USE_SSE4 0
+#define SIMD_UTILS_USE_FMA  0
+#endif
+#if defined(FEMFX_SIMD_AVX2)
+#define SIMD_UTILS_USE_AVX 1
+#else
+#define SIMD_UTILS_USE_AVX 0
+#endif
 
 #define SIMD_UTILS_UNALIGNED_LOAD        1
 #define SIMD_UTILS_USE_SSE3_LDDQU        (0 && SIMD_UTILS_USE_SSE3)
 #define SIMD_UTILS_USE_SSE4_DP_PS        (0 && SIMD_UTILS_USE_SSE4)
 #define SIMD_UTILS_USE_SSE4_MULLO_EPI32  (1 && SIMD_UTILS_USE_SSE4)
 
+#if defined(_MSC_VER)
 #define SIMD_UTILS_ALIGN16      __declspec(align(16))
 #define SIMD_UTILS_FORCE_INLINE __forceinline
+#else
+#define SIMD_UTILS_ALIGN16      __attribute__((aligned(16)))
+#define SIMD_UTILS_FORCE_INLINE inline __attribute__((always_inline))
+#endif
 
 union Simd128Union
 {
@@ -86,23 +188,31 @@ static SIMD_UTILS_FORCE_INLINE float simd_getw_ps(__m128 m)
 
 static SIMD_UTILS_FORCE_INLINE float simd_getelem_ps(__m128 m, int idx)
 {
-    return m.m128_f32[idx];
+    Simd128Union tmp;
+    tmp.vf = m;
+    return tmp.f[idx];
 }
 
 static SIMD_UTILS_FORCE_INLINE int32_t simd_getelem_epi32(__m128 m, int idx)
 {
-    return m.m128_i32[idx];
+    Simd128Union tmp;
+    tmp.vf = m;
+    return tmp.i[idx];
 }
 
 static SIMD_UTILS_FORCE_INLINE int32_t simd_getelem_epi32(__m128i m, int idx)
 {
-    return m.m128i_i32[idx];
+    Simd128Union tmp;
+    tmp.vi = m;
+    return tmp.i[idx];
 }
 
 #if SIMD_UTILS_USE_AVX
 static SIMD_UTILS_FORCE_INLINE float simd_getelem_ps(__m256 m, int idx)
 {
-    return m.m256_f32[idx];
+    Simd256Union tmp;
+    tmp.vf = m;
+    return tmp.f[idx & 7];
 }
 
 static SIMD_UTILS_FORCE_INLINE int32_t simd_getelem_epi32(__m256 m, int idx)
@@ -114,7 +224,9 @@ static SIMD_UTILS_FORCE_INLINE int32_t simd_getelem_epi32(__m256 m, int idx)
 
 static SIMD_UTILS_FORCE_INLINE int32_t simd_getelem_epi32(__m256i m, int idx)
 {
-    return m.m256i_i32[idx];
+    Simd256Union tmp;
+    tmp.vi = m;
+    return tmp.i[idx];
 }
 #endif
 
@@ -223,23 +335,35 @@ static SIMD_UTILS_FORCE_INLINE void simd_set_soa_vec4(__m256* x, __m256* y, __m2
 
 static SIMD_UTILS_FORCE_INLINE void simd_setelem_ps(__m128& m, float value, int idx)
 {
-    m.m128_f32[idx] = value;
+    Simd128Union tmp;
+    tmp.vf = m;
+    tmp.f[idx] = value;
+    m = tmp.vf;
 }
 
 static SIMD_UTILS_FORCE_INLINE void simd_setelem_epi32(__m128& m, int32_t value, int idx)
 {
-    m.m128_i32[idx] = value;
+    Simd128Union tmp;
+    tmp.vf = m;
+    tmp.i[idx] = value;
+    m = tmp.vf;
 }
 
 static SIMD_UTILS_FORCE_INLINE void simd_setelem_epi32(__m128i& m, int32_t value, int idx)
 {
-    m.m128i_i32[idx] = value;
+    Simd128Union tmp;
+    tmp.vi = m;
+    tmp.i[idx] = value;
+    m = tmp.vi;
 }
 
 #if SIMD_UTILS_USE_AVX
 static SIMD_UTILS_FORCE_INLINE void simd_setelem_ps(__m256& m, float value, int idx)
 {
-    m.m256_f32[idx] = value;
+    Simd256Union tmp;
+    tmp.vf = m;
+    tmp.f[idx] = value;
+    m = tmp.vf;
 }
 
 static SIMD_UTILS_FORCE_INLINE void simd_setelem_epi32(__m256& m, int32_t value, int idx)
@@ -252,7 +376,10 @@ static SIMD_UTILS_FORCE_INLINE void simd_setelem_epi32(__m256& m, int32_t value,
 
 static SIMD_UTILS_FORCE_INLINE void simd_setelem_epi32(__m256i& m, int32_t value, int idx)
 {
-    m.m256i_i32[idx] = value;
+    Simd256Union tmp;
+    tmp.vi = m;
+    tmp.i[idx] = value;
+    m = tmp.vi;
 }
 #endif
 
@@ -268,19 +395,21 @@ static SIMD_UTILS_FORCE_INLINE __m128 simd_load3_unaligned_ps(const float* fptr)
     m = _mm_loadu_ps(fptr);
 #endif
 #else
-    m.m128_f32[0] = fptr[0];
-    m.m128_f32[1] = fptr[1];
-    m.m128_f32[2] = fptr[2];
+    m = _mm_setr_ps(fptr[0], fptr[1], fptr[2], 0.0f);
 #endif
-    m.m128_f32[3] = 0.0f;
-    return m;
+    Simd128Union tmp;
+    tmp.vf = m;
+    tmp.f[3] = 0.0f;
+    return tmp.vf;
 }
 
 static SIMD_UTILS_FORCE_INLINE void simd_store3_unaligned_ps(float* fptr, __m128 m)
 {
-    fptr[0] = m.m128_f32[0];
-    fptr[1] = m.m128_f32[1];
-    fptr[2] = m.m128_f32[2];
+    Simd128Union tmp;
+    tmp.vf = m;
+    fptr[0] = tmp.f[0];
+    fptr[1] = tmp.f[1];
+    fptr[2] = tmp.f[2];
 }
 
 static SIMD_UTILS_FORCE_INLINE __m128i simd_load4_unaligned_ps(const int32_t* iptr)
@@ -294,12 +423,7 @@ static SIMD_UTILS_FORCE_INLINE __m128i simd_load4_unaligned_ps(const int32_t* ip
     return tmp.vi;
 #endif
 #else
-    __m128i m;
-    m.m128i_i32[0] = iptr[0];
-    m.m128i_i32[1] = iptr[1];
-    m.m128i_i32[2] = iptr[2];
-    m.m128i_i32[3] = iptr[3];
-    return m;
+    return _mm_set_epi32(iptr[3], iptr[2], iptr[1], iptr[0]);
 #endif
 }
 
@@ -314,12 +438,7 @@ static SIMD_UTILS_FORCE_INLINE __m128 simd_load4_unaligned_ps(const float* fptr)
     return _mm_loadu_ps(fptr);
 #endif
 #else
-    __m128 m;
-    m.m128_f32[0] = fptr[0];
-    m.m128_f32[1] = fptr[1];
-    m.m128_f32[2] = fptr[2];
-    m.m128_f32[3] = fptr[3];
-    return m;
+    return _mm_set_ps(fptr[3], fptr[2], fptr[1], fptr[0]);
 #endif
 }
 
@@ -328,10 +447,12 @@ static SIMD_UTILS_FORCE_INLINE void simd_store4_unaligned_ps(float* fptr, __m128
 #if SIMD_UTILS_UNALIGNED_LOAD
     _mm_storeu_ps(fptr, m);
 #else
-    fptr[0] = m.m128_f32[0];
-    fptr[1] = m.m128_f32[1];
-    fptr[2] = m.m128_f32[2];
-    fptr[3] = m.m128_f32[3];
+    Simd128Union tmp;
+    tmp.vf = m;
+    fptr[0] = tmp.f[0];
+    fptr[1] = tmp.f[1];
+    fptr[2] = tmp.f[2];
+    fptr[3] = tmp.f[3];
 #endif
 }
 
@@ -343,16 +464,8 @@ static SIMD_UTILS_FORCE_INLINE __m256i simd_load8_unaligned_ps(const int32_t* ip
     tmp.vf = _mm256_loadu_ps((float*)iptr);
     return tmp.vi;
 #else
-    __m256i m;
-    m.m256i_i32[0] = iptr[0];
-    m.m256i_i32[1] = iptr[1];
-    m.m256i_i32[2] = iptr[2];
-    m.m256i_i32[3] = iptr[3];
-    m.m256i_i32[4] = iptr[4];
-    m.m256i_i32[5] = iptr[5];
-    m.m256i_i32[6] = iptr[6];
-    m.m256i_i32[7] = iptr[7];
-    return m;
+    return _mm256_setr_epi32(iptr[0], iptr[1], iptr[2], iptr[3],
+                             iptr[4], iptr[5], iptr[6], iptr[7]);
 #endif
 }
 
@@ -361,16 +474,8 @@ static SIMD_UTILS_FORCE_INLINE __m256 simd_load8_unaligned_ps(const float* fptr)
 #if SIMD_UTILS_UNALIGNED_LOAD
     return _mm256_loadu_ps(fptr);
 #else
-    __m256 m;
-    m.m256_f32[0] = fptr[0];
-    m.m256_f32[1] = fptr[1];
-    m.m256_f32[2] = fptr[2];
-    m.m256_f32[3] = fptr[3];
-    m.m256_f32[4] = fptr[4];
-    m.m256_f32[5] = fptr[5];
-    m.m256_f32[6] = fptr[6];
-    m.m256_f32[7] = fptr[7];
-    return m;
+    return _mm256_setr_ps(fptr[0], fptr[1], fptr[2], fptr[3],
+                          fptr[4], fptr[5], fptr[6], fptr[7]);
 #endif
 }
 
@@ -379,14 +484,16 @@ static SIMD_UTILS_FORCE_INLINE void simd_store8_unaligned_ps(float* fptr, __m256
 #if SIMD_UTILS_UNALIGNED_LOAD
     _mm256_storeu_ps(fptr, m);
 #else
-    fptr[0] = m.m256_f32[0];
-    fptr[1] = m.m256_f32[1];
-    fptr[2] = m.m256_f32[2];
-    fptr[3] = m.m256_f32[3];
-    fptr[4] = m.m256_f32[4];
-    fptr[5] = m.m256_f32[5];
-    fptr[6] = m.m256_f32[6];
-    fptr[7] = m.m256_f32[7];
+    Simd256Union tmp;
+    tmp.vf = m;
+    fptr[0] = tmp.f[0];
+    fptr[1] = tmp.f[1];
+    fptr[2] = tmp.f[2];
+    fptr[3] = tmp.f[3];
+    fptr[4] = tmp.f[4];
+    fptr[5] = tmp.f[5];
+    fptr[6] = tmp.f[6];
+    fptr[7] = tmp.f[7];
 #endif
 }
 #endif
@@ -432,10 +539,14 @@ static SIMD_UTILS_FORCE_INLINE __m256i simd_not_si256(__m256i m)
 #endif
 
 // vector unsigned int comparisons
-static SIMD_UTILS_FORCE_INLINE __m128i simd_cmple_epu32(__m128i a, __m128i b) { return _mm_cmpeq_epi32(a, _mm_min_epu32(a, b)); }
-static SIMD_UTILS_FORCE_INLINE __m128i simd_cmpge_epu32(__m128i a, __m128i b) { return _mm_cmpeq_epi32(a, _mm_max_epu32(a, b)); }
-static SIMD_UTILS_FORCE_INLINE __m128i simd_cmplt_epu32(__m128i a, __m128i b) { return simd_not_si128(simd_cmpge_epu32(a, b)); }
-static SIMD_UTILS_FORCE_INLINE __m128i simd_cmpgt_epu32(__m128i a, __m128i b) { return simd_not_si128(simd_cmple_epu32(a, b)); }
+static SIMD_UTILS_FORCE_INLINE __m128i simd_cmplt_epu32(__m128i a, __m128i b)
+{
+    const __m128i sign = _mm_set1_epi32(0x80000000);
+    return _mm_cmpgt_epi32(_mm_xor_si128(b, sign), _mm_xor_si128(a, sign));
+}
+static SIMD_UTILS_FORCE_INLINE __m128i simd_cmpgt_epu32(__m128i a, __m128i b) { return simd_cmplt_epu32(b, a); }
+static SIMD_UTILS_FORCE_INLINE __m128i simd_cmple_epu32(__m128i a, __m128i b) { return simd_not_si128(simd_cmpgt_epu32(a, b)); }
+static SIMD_UTILS_FORCE_INLINE __m128i simd_cmpge_epu32(__m128i a, __m128i b) { return simd_not_si128(simd_cmplt_epu32(a, b)); }
 
 #if SIMD_UTILS_USE_AVX
 static SIMD_UTILS_FORCE_INLINE __m256i simd_cmple_epu32(__m256i a, __m256i b) { return _mm256_cmpeq_epi32(a, _mm256_min_epu32(a, b)); }
@@ -613,3 +724,5 @@ static SIMD_UTILS_FORCE_INLINE __m128 simd_3dot3_ps(__m128 mx, __m128 my, __m128
     result = simd_insertz_ps(result, simd_dot3_ps(mz, v));
     return result;
 }
+
+#endif // FEMFX SIMD x86/SSE2/AVX2

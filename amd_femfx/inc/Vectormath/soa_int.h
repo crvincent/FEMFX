@@ -31,7 +31,11 @@
 #define _SOA_INT_H
 
 #include "vectormath_utils.h"
+#if defined(FEMFX_SIMD_SCALAR)
+#include "soa_scalar.h"
+#endif
 
+#if !defined(FEMFX_SIMD_SCALAR)
 namespace FmVectormath {
 
     class Soa4Float;
@@ -637,5 +641,7 @@ namespace FmVectormath {
 #endif // SIMD_UTILS_USE_AVX
 
 } // namespace FmVectormath
+
+#endif // !FEMFX_SIMD_SCALAR
 
 #endif // _SOA_INT_H

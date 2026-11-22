@@ -30,6 +30,8 @@
 #ifndef _SIMD_FLOAT_H
 #define _SIMD_FLOAT_H
 
+#if !defined(FEMFX_SIMD_SCALAR)
+
 #include <math.h>
 #include <xmmintrin.h>
 
@@ -341,5 +343,7 @@ select(const SimdFloat & vec0, const SimdFloat & vec1, const SimdBool &select_ve
 }
 
 } // namespace FmVectormath
+
+#endif // !FEMFX_SIMD_SCALAR
 
 #endif // SimdFloat_h

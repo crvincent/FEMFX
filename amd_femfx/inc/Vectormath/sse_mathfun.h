@@ -34,6 +34,7 @@
   (this is the zlib license)
 */
 
+#if !defined(FEMFX_SIMD_SCALAR)
 #include <xmmintrin.h>
 
 /* yes I know, the top of this file is quite ugly */
@@ -713,4 +714,6 @@ static inline void sincos_ps(v4sf x, v4sf *s, v4sf *c) {
   *s = _mm_xor_ps(xmm1, sign_bit_sin);
   *c = _mm_xor_ps(xmm2, sign_bit_cos);
 }
+
+#endif // !FEMFX_SIMD_SCALAR
 

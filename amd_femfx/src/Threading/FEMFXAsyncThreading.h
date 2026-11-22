@@ -34,6 +34,16 @@ THE SOFTWARE.
 
 namespace AMD
 {
+    template<class T>
+    static FM_FORCE_INLINE void FmDeleteTaskData(T* taskData)
+    {
+        delete taskData;
+    }
+
+    static FM_FORCE_INLINE void FmDeleteTaskData(void*)
+    {
+    }
+
     // Creates a task function and wrapper function to run task inside FmExecuteTask
 #define FM_WRAPPED_TASK_FUNC(taskFunc) \
     void taskFunc(void* inTaskData, int32_t inTaskBeginIndex, int32_t inTaskEndIndex); \
@@ -55,6 +65,10 @@ namespace AMD
 
         FmTask() : func(NULL), data(NULL), beginIndex(0), endIndex(0) {}
     };
+
+    // Set next task for thread to execute in FmExecuteTask() loop.
+    void FmSetNextTask(FmTaskFuncCallback taskFunc, void* taskData, int32_t taskBeginIndex, int32_t taskEndIndex);
+    void FmSetNextTask(const FmTask& inTask);
 
     // Holds an atomic count of incomplete tasks, and the follow-up task to execute when all tasks are complete.
     class FmAsyncTasksProgress
@@ -138,7 +152,7 @@ namespace AMD
 
                 if (taskDataToDelete)  // task data might include this FmAsyncTasksProgress, but done reading
                 {
-                    delete taskDataToDelete;
+                    FmDeleteTaskData(taskDataToDelete);
                 }
 
                 return true;
@@ -197,7 +211,4 @@ namespace AMD
     // Async tasks need to be executed using this function, which starts a loop that will pick up subsequent tasks set by FmSetNextTask()
     void FmExecuteTask(FmTaskFuncCallback taskFunc, void* taskData, int32_t taskBeginIndex, int32_t taskEndIndex);
 
-    // Set next task for thread to execute in FmExecuteTask() loop
-    void FmSetNextTask(FmTaskFuncCallback taskFunc, void* taskData, int32_t taskBeginIndex, int32_t taskEndIndex);
-    void FmSetNextTask(const FmTask& inTask);
 }

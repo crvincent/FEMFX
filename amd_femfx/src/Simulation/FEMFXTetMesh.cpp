@@ -761,8 +761,7 @@ namespace AMD
 
     void FmWriteTetMesh(const char* filename, FmTetMesh* tetMesh)
     {
-        FILE* fp;
-        fopen_s(&fp, filename, "wb");
+        FILE* fp = fopen(filename, "wb");
 
         if (!fp)
         {
@@ -821,8 +820,7 @@ namespace AMD
 
     void FmReadTetMesh(const char* filename, FmTetMesh* tetMesh)
     {
-        FILE* fp;
-        fopen_s(&fp, filename, "rb");
+        FILE* fp = fopen(filename, "rb");
 
         if (!fp)
         {

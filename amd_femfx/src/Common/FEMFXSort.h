@@ -49,16 +49,16 @@ qsort_permutation(void *a, int *permutation, size_t n, size_t es,
 
 namespace AMD
 {
-    template<class T>
+    template<class T, class CompareClass>
     void FmSortTask(void* inTaskData, int32_t inTaskBeginIndex, int32_t inTaskEndIndex);
 
-    template<class T>
+    template<class T, class CompareClass>
     void FmSortTaskWrapped(void* inTaskData, int32_t inTaskBeginIndex, int32_t inTaskEndIndex);
 
-    template<class T>
+    template<class T, class CompareClass>
     void FmMergeTask(void* inTaskData, int32_t inTaskBeginIndex, int32_t inTaskEndIndex);
 
-    template<class T>
+    template<class T, class CompareClass>
     void FmMergeTaskWrapped(void* inTaskData, int32_t inTaskBeginIndex, int32_t inTaskEndIndex);
 
     class FmSortTaskGraphNode : public FmTaskGraphNode

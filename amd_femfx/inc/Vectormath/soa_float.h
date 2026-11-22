@@ -31,17 +31,24 @@
 #define _SOA_FLOAT_H
 
 #include "vectormath_utils.h"
+#if defined(FEMFX_SIMD_SCALAR)
+#include "soa_scalar.h"
+#else
 #pragma warning(push, 0)
 #ifndef USE_SSE2
 #define USE_SSE2
 #endif
-#ifndef __AVX2__
+#if defined(FEMFX_SIMD_AVX2) && !defined(__AVX2__)
 #define __AVX2__
 #endif
 #include "sse_mathfun.h"
+#if defined(FEMFX_SIMD_AVX2)
 #include "avx_mathfun.h"
+#endif
 #pragma warning(pop)
+#endif
 
+#if !defined(FEMFX_SIMD_SCALAR)
 namespace FmVectormath {
 
     class Soa4Int;
@@ -518,14 +525,8 @@ namespace FmVectormath {
         float scalar0, float scalar1, float scalar2, float scalar3,
         float scalar4, float scalar5, float scalar6, float scalar7)
     {
-        mData.m256_f32[0] = scalar0;
-        mData.m256_f32[1] = scalar1;
-        mData.m256_f32[2] = scalar2;
-        mData.m256_f32[3] = scalar3;
-        mData.m256_f32[4] = scalar4;
-        mData.m256_f32[5] = scalar5;
-        mData.m256_f32[6] = scalar6;
-        mData.m256_f32[7] = scalar7;
+        mData = _mm256_setr_ps(scalar0, scalar1, scalar2, scalar3,
+                               scalar4, scalar5, scalar6, scalar7);
     }
 
     SIMD_VECTORMATH_FORCE_INLINE Soa8Float::Soa8Float(const Soa8Bool & vec)
@@ -540,12 +541,12 @@ namespace FmVectormath {
 
     SIMD_VECTORMATH_FORCE_INLINE float Soa8Float::getSlice(uint32_t idx) const
     {
-        return mData.m256_f32[idx];
+        return simd_getelem_ps(mData, (int)idx);
     }
 
     SIMD_VECTORMATH_FORCE_INLINE void Soa8Float::setSlice(uint32_t idx, float value)
     {
-        mData.m256_f32[idx] = value;
+        simd_setelem_ps(mData, value, (int)idx);
     }
 
     SIMD_VECTORMATH_FORCE_INLINE const Soa8Float Soa8Float::operator ++ (int)
@@ -740,5 +741,7 @@ namespace FmVectormath {
 #endif // SIMD_UTILS_USE_AVX
 
 } // namespace FmVectormath
+
+#endif // !FEMFX_SIMD_SCALAR
 
 #endif // _SOA_FLOAT_H

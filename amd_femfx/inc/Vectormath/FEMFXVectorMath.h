@@ -31,23 +31,34 @@ THE SOFTWARE.
 
 #include <math.h>
 #include <float.h>
+#include "simd_utils.h"
 
 // API derived from Sony Vectormath released with Bullet.
 // Adds public element access and mul() instead of operator* for more similarity with HLSL.
 // SSE version includes unions for element access.
 #define _VECTORMATH_DEBUG
 #include "vectormath_aos.h"        // scalar math implementation
+#if !defined(FEMFX_SIMD_SCALAR)
 #include "simd_vectormath_aos.h"   // SIMD implementation of AoS vectors
+#endif
 #include "soa_vectormath.h"        // SoA vector and matrix types; can template by SoA fundamental type
+#if defined(FEMFX_SIMD_SCALAR)
+#include "soa_scalar.h"             // portable scalar SoA fundamental types
+#else
 #include "soa_float.h"             // SoA fundamental types
 #include "soa_int.h"
 #include "soa_uint.h"
 #include "soa_bool.h"
+#endif
 
 #define FM_NORMALIZE_MAG_SQR_TOL 1.0e-30f
 
 #ifndef FM_FORCE_INLINE 
+#if (defined(_WIN32) && defined(_MSC_VER))
 #define FM_FORCE_INLINE __forceinline
+#else
+#define FM_FORCE_INLINE inline
+#endif
 #endif
 
 namespace AMD
@@ -65,6 +76,15 @@ namespace AMD
     typedef FmVectormath::Matrix4        FmMatrix4;
     typedef FmVectormath::Transform3     FmTransform3;
 #else
+#if defined(FEMFX_SIMD_SCALAR)
+    typedef FmVectormath::Vector3        FmVector3;
+    typedef FmVectormath::Vector4        FmVector4;
+    typedef FmVectormath::Point3         FmPoint3;
+    typedef FmVectormath::Quat           FmQuat;
+    typedef FmVectormath::Matrix3        FmMatrix3;
+    typedef FmVectormath::Matrix4        FmMatrix4;
+    typedef FmVectormath::Transform3     FmTransform3;
+#else
     typedef FmVectormath::SimdVector3        FmVector3;
     typedef FmVectormath::SimdVector4        FmVector4;
     typedef FmVectormath::SimdPoint3         FmPoint3;
@@ -73,7 +93,17 @@ namespace AMD
     typedef FmVectormath::SimdMatrix4        FmMatrix4;
     typedef FmVectormath::SimdTransform3     FmTransform3;
 #endif
+#endif
 
+#if defined(FEMFX_SIMD_SCALAR)
+    typedef FmVectormath::Vector3        FmSimdVector3;
+    typedef FmVectormath::Vector4        FmSimdVector4;
+    typedef FmVectormath::Point3         FmSimdPoint3;
+    typedef FmVectormath::Quat           FmSimdQuat;
+    typedef FmVectormath::Matrix3        FmSimdMatrix3;
+    typedef FmVectormath::Matrix4        FmSimdMatrix4;
+    typedef FmVectormath::Transform3     FmSimdTransform3;
+#else
     typedef FmVectormath::SimdVector3    FmSimdVector3;
     typedef FmVectormath::SimdVector4    FmSimdVector4;
     typedef FmVectormath::SimdPoint3     FmSimdPoint3;
@@ -81,6 +111,7 @@ namespace AMD
     typedef FmVectormath::SimdMatrix3    FmSimdMatrix3;
     typedef FmVectormath::SimdMatrix4    FmSimdMatrix4;
     typedef FmVectormath::SimdTransform3 FmSimdTransform3;
+#endif
     typedef FmVectormath::Soa4Float      FmSoa4Float;
     typedef FmVectormath::Soa4Int        FmSoa4Int;
     typedef FmVectormath::Soa4Uint       FmSoa4Uint;
@@ -136,7 +167,11 @@ namespace AMD
     };
 #endif
 
+#if defined(FEMFX_SIMD_SCALAR) || !SIMD_UTILS_USE_AVX
+    typedef FmSoa4Types FmSoaTypes;
+#else
     typedef FmSoa8Types FmSoaTypes;
+#endif
 
     template<class SoaTypes>
     static FM_FORCE_INLINE FmVector3 FmGetSlice(const typename SoaTypes::SoaVector3& vec, uint32_t sliceIdx)
@@ -286,14 +321,14 @@ namespace AMD
 #if FM_USE_SCALAR_VECTORMATH
     static FM_FORCE_INLINE void FmSetSoaFromAlignedAos(FmSoa4Types::SoaVector3* result, const FmVector3* aosVecs)
     {
-        __m128 x, y, z;
+        FmSimdFloat128 x, y, z;
         simd_set_soa_vec3(&x, &y, &z, (float*)aosVecs);
         *result = FmSoa4Types::SoaVector3(FmSoa4Float(x), FmSoa4Float(y), FmSoa4Float(z));
     }
 
     static FM_FORCE_INLINE void FmSetSoaFromAlignedAos(FmSoa4Types::SoaVector4* result, const FmVector4* aosVecs)
     {
-        __m128 x, y, z, w;
+        FmSimdFloat128 x, y, z, w;
         simd_set_soa_vec4(&x, &y, &z, &w, (float*)aosVecs);
         *result = FmSoa4Types::SoaVector4(FmSoa4Float(x), FmSoa4Float(y), FmSoa4Float(z), FmSoa4Float(w));
     }
@@ -562,7 +597,7 @@ namespace AMD
         return result;
     }
 
-#if FM_USE_SCALAR_VECTORMATH
+#if FM_USE_SCALAR_VECTORMATH && !defined(FEMFX_SIMD_SCALAR)
     static FM_FORCE_INLINE FmSimdVector3 FmNormalize(float* lenSqr, const FmSimdVector3& a)
     {
         float lSqr = dot(a, a);
@@ -630,6 +665,7 @@ namespace AMD
     }
 #endif
 
+#if !defined(FEMFX_SIMD_SCALAR)
     static FM_FORCE_INLINE FmSimdVector3 FmInitSimdVector3(const FmVector3& vec)
     {
         __m128 m = simd_load3_unaligned_ps(&vec.x);
@@ -657,6 +693,27 @@ namespace AMD
     {
         return FmMatrix3(FmInitVector3(mat.getCol0()), FmInitVector3(mat.getCol1()), FmInitVector3(mat.getCol2()));
     }
+#else
+    static FM_FORCE_INLINE FmSimdVector3 FmInitSimdVector3(const FmVector3& vec)
+    {
+        return FmSimdVector3(vec.x, vec.y, vec.z);
+    }
+
+    static FM_FORCE_INLINE FmSimdMatrix3 FmInitSimdMatrix3(const FmMatrix3& mat)
+    {
+        return FmSimdMatrix3(mat.col0, mat.col1, mat.col2);
+    }
+
+    static FM_FORCE_INLINE FmVector3 FmInitVector3(const FmSimdVector3& vec)
+    {
+        return FmVector3(vec.x, vec.y, vec.z);
+    }
+
+    static FM_FORCE_INLINE FmMatrix3 FmInitMatrix3(const FmSimdMatrix3& mat)
+    {
+        return FmMatrix3(mat.col0, mat.col1, mat.col2);
+    }
+#endif
 
     template<class SoaTypes>
     static FM_FORCE_INLINE const typename SoaTypes::SoaVector3 FmInitVector3(typename SoaTypes::SoaFloat x, typename SoaTypes::SoaFloat y, typename SoaTypes::SoaFloat z)

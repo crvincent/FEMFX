@@ -112,6 +112,9 @@ public:
     // Get the z element of a 3-D vector
     // 
     VECTORMATH_FORCE_INLINE float getZ( ) const;
+#if defined(FEMFX_SIMD_SCALAR)
+    VECTORMATH_FORCE_INLINE FmSimdFloat128 get128() const;
+#endif
 
     // Set an x, y, or z element of a 3-D vector by index
     // 
@@ -418,6 +421,9 @@ public:
     // Get the w element of a 4-D vector
     // 
     VECTORMATH_FORCE_INLINE float getW( ) const;
+#if defined(FEMFX_SIMD_SCALAR)
+    VECTORMATH_FORCE_INLINE FmSimdFloat128 get128() const;
+#endif
 
     // Set an x, y, z, or w element of a 4-D vector by index
     // 

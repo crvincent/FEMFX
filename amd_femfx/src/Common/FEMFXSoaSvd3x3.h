@@ -64,7 +64,7 @@ namespace AMD
 
         const int numIterations = 4;
 
-        typename T::SoaMatrix3 V = typename T::SoaMatrix3::identity();
+        typename T::SoaMatrix3 V = T::SoaMatrix3::identity();
 
         for (int i = 0; i < numIterations; i++)
         {
@@ -260,6 +260,6 @@ namespace AMD
         sigma.y = select(0.0f, 1.0f / sigma.y, absSigma.y > tol);
         sigma.z = select(0.0f, 1.0f / sigma.z, absSigma.z > tol);
 
-        return mul(V, mul(typename T::SoaMatrix3::scale(sigma), transpose(U)));
+        return mul(V, mul(T::SoaMatrix3::scale(sigma), transpose(U)));
     }
 }

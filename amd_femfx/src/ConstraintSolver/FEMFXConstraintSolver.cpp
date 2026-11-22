@@ -599,9 +599,7 @@ namespace AMD
             if (solverArraysStart + constraintIslandSolverDataSize <= solverArraysEnd)
             {
                 // Sub-allocate from scene memory
-#if defined(_DEBUG) || FM_DEBUG_CHECKS
                 uint8_t* pDataStart = solverArraysStart;
-#endif
                 islandSolverDataArraysNumBytes += constraintIslandSolverDataSize;
 
                 FmAllocConstraintIslandSolverDataFromBuffer(constraintSolverData, island, solverArraysStart, solverArraysEnd);

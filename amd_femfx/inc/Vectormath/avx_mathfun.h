@@ -37,6 +37,7 @@
   (this is the zlib license)
 */
 
+#if !defined(FEMFX_SIMD_SCALAR)
 #include <immintrin.h>
 
 /* yes I know, the top of this file is quite ugly */
@@ -75,10 +76,10 @@ _PS256_CONST(0p5, 0.5f);
 /* the smallest non denormalized float number */
 _PS256_CONST_TYPE(min_norm_pos, int, 0x00800000);
 _PS256_CONST_TYPE(mant_mask, int, 0x7f800000);
-_PS256_CONST_TYPE(inv_mant_mask, int, ~0x7f800000);
+_PS256_CONST_TYPE(inv_mant_mask, int, (int)~0x7f800000u);
 
-_PS256_CONST_TYPE(sign_mask, int, 0x80000000);
-_PS256_CONST_TYPE(inv_sign_mask, int, ~0x80000000);
+_PS256_CONST_TYPE(sign_mask, int, (int)0x80000000u);
+_PS256_CONST_TYPE(inv_sign_mask, int, (int)~0x80000000u);
 
 _PI32_CONST256(0, 0);
 _PI32_CONST256(1, 1);
@@ -722,4 +723,6 @@ static inline void sincos256_ps(v8sf x, v8sf *s, v8sf *c) {
   *s = _mm256_xor_ps(xmm1, sign_bit_sin);
   *c = _mm256_xor_ps(xmm2, sign_bit_cos);
 }
+
+#endif // !FEMFX_SIMD_SCALAR
 

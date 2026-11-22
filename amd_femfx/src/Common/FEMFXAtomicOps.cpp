@@ -32,28 +32,19 @@ namespace AMD
 {
     void FmAtomicMax(uint* pValue, uint newValue)
     {
-        int32_t initialVal = FmAtomicRead(pValue);
-        uint maxValue;
+        uint initialVal = FmAtomicRead(pValue);
         while (true)
         {
-            maxValue = initialVal;
-
-            if (newValue > maxValue)
+            if (newValue > initialVal)
             {
-                int32_t compareValue = InterlockedCompareExchange(pValue, newValue, initialVal);
+                uint compareValue = FmAtomicCompareExchange(pValue, newValue, initialVal);
                 if (compareValue == initialVal)
-                {
                     break;
-                }
                 else
-                {
                     initialVal = compareValue;
-                }
             }
             else
-            {
                 break;
-            }
         }
     }
 }

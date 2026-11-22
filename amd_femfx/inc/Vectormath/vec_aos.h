@@ -45,6 +45,11 @@
 
 namespace FmVectormath {
 
+#if defined(FEMFX_SIMD_SCALAR)
+VECTORMATH_FORCE_INLINE FmSimdFloat128 Vector3::get128() const { return FmSimdFloat128(x,y,z,0.0f); }
+VECTORMATH_FORCE_INLINE FmSimdFloat128 Vector4::get128() const { return FmSimdFloat128(x,y,z,w); }
+#endif
+
 VECTORMATH_FORCE_INLINE Vector3::Vector3( const Vector3 & vec )
 {
     x = vec.x;

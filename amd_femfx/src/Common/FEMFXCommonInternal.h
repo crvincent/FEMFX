@@ -27,11 +27,8 @@ THE SOFTWARE.
 #include "FEMFXCommon.h"
 
 #include <algorithm>
-
-#ifdef _WIN32
-#include <malloc.h>
-#include <intrin.h> // for __lzcnt
-#endif
+#include <cstring>
+#include <chrono>
 
 // Bit flags
 #define FM_VERT_FLAG_KINEMATIC                            0x1          // Kinematically driven vertex
@@ -89,17 +86,24 @@ namespace AMD
     // Count leading zeros
     static FM_FORCE_INLINE uint FmCountLeadingZeros(uint x)
     {
-#ifdef WIN32
-        return __lzcnt(x);
-#endif
+        if (x == 0)
+            return 32;
+        uint count = 0;
+        while ((x & 0x80000000u) == 0)
+        {
+            ++count;
+            x <<= 1;
+        }
+        return count;
     }
 
     // Count set bits
     static FM_FORCE_INLINE uint FmCountSetBits(uint x)
     {
-#ifdef WIN32
-        return (int)_mm_popcnt_u32(x);
-#endif
+        x = x - ((x >> 1) & 0x55555555u);
+        x = (x & 0x33333333u) + ((x >> 2) & 0x33333333u);
+        x = (x + (x >> 4)) & 0x0f0f0f0fu;
+        return (x * 0x01010101u) >> 24;
     }
 
     static FM_FORCE_INLINE uint FmIntLog2(uint x)
@@ -172,20 +176,16 @@ extern bool gFEMFXTraceEnabled;
 #endif
 
 #if FM_TIMINGS
-#include "Windows.h"
 namespace AMD
 {
     // Get system time in millseconds
     static FM_FORCE_INLINE double FmGetTimeMsec()
     {
-        LARGE_INTEGER freq, counter;
-        QueryPerformanceFrequency(&freq);
-        QueryPerformanceCounter(&counter);
-
-        uint64_t timeseconds = counter.QuadPart / freq.QuadPart;
-        uint64_t timeremainder = counter.QuadPart % freq.QuadPart;
-
-        return ((double)timeseconds + (double)timeremainder / (double)freq.QuadPart) * 1000.0;
+        static const std::chrono::steady_clock::time_point start =
+            std::chrono::steady_clock::now();
+        const std::chrono::steady_clock::time_point now =
+            std::chrono::steady_clock::now();
+        return std::chrono::duration<double, std::milli>(now - start).count();
     }
 }
 #define FM_GET_TIME(t) t = FmGetTimeMsec()

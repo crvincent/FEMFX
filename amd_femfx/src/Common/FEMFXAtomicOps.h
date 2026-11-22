@@ -30,68 +30,88 @@ THE SOFTWARE.
 
 #include "FEMFXCommon.h"
 
-#ifdef WIN32
-#include <Windows.h>
+#if defined(_MSC_VER)
+#include <intrin.h>
 #endif
 
 namespace AMD
 {
     // Atomic operation interface
 
-#ifdef WIN32
-    // Atomically increment and return new value
     static FM_FORCE_INLINE uint FmAtomicIncrement(uint* pValue)
     {
-        return InterlockedIncrement((volatile unsigned long *)pValue);
+#if defined(_MSC_VER)
+        return (uint)_InterlockedIncrement(reinterpret_cast<volatile long*>(pValue));
+#else
+        return (uint)__atomic_add_fetch(pValue, 1u, __ATOMIC_SEQ_CST);
+#endif
     }
-
-    // Atomically decrement and return new value
     static FM_FORCE_INLINE uint FmAtomicDecrement(uint* pValue)
     {
-        return InterlockedDecrement((volatile unsigned long *)pValue);
+#if defined(_MSC_VER)
+        return (uint)_InterlockedDecrement(reinterpret_cast<volatile long*>(pValue));
+#else
+        return (uint)__atomic_sub_fetch(pValue, 1u, __ATOMIC_SEQ_CST);
+#endif
     }
-
-    // Atomically add to *pValue and return result
     static FM_FORCE_INLINE uint FmAtomicAdd(uint* pValue, uint addedValue)
     {
-        return (uint)InterlockedAdd((volatile LONG *)pValue, (LONG)addedValue);
+#if defined(_MSC_VER)
+        return (uint)_InterlockedExchangeAdd(
+            reinterpret_cast<volatile long*>(pValue), static_cast<long>(addedValue)) + addedValue;
+#else
+        return (uint)__atomic_add_fetch(pValue, addedValue, __ATOMIC_SEQ_CST);
+#endif
     }
-
-    // Atomically subtract from *pValue and return result
     static FM_FORCE_INLINE uint FmAtomicSub(uint* pValue, uint subtractedValue)
     {
-        return (uint)InterlockedAdd((volatile LONG *)pValue, -(LONG)subtractedValue);
+#if defined(_MSC_VER)
+        return (uint)_InterlockedExchangeAdd(
+            reinterpret_cast<volatile long*>(pValue), -static_cast<long>(subtractedValue)) - subtractedValue;
+#else
+        return (uint)__atomic_sub_fetch(pValue, subtractedValue, __ATOMIC_SEQ_CST);
+#endif
     }
-
-    // Atomically OR with *pValue and return result
     static FM_FORCE_INLINE uint FmAtomicOr(uint* pValue, uint orValue)
     {
-        return (uint)InterlockedOr((volatile LONG *)pValue, (LONG)orValue);
+#if defined(_MSC_VER)
+        return (uint)_InterlockedOr(
+            reinterpret_cast<volatile long*>(pValue), static_cast<long>(orValue));
+#else
+        return (uint)__atomic_fetch_or(pValue, orValue, __ATOMIC_SEQ_CST);
+#endif
     }
-
-    // Atomically replace *pValue with newValue if currently equal to compareValue, and return the initial value
     static FM_FORCE_INLINE uint FmAtomicCompareExchange(uint* pValue, uint newValue, uint compareValue)
     {
-        return InterlockedCompareExchange((volatile unsigned long *)pValue, newValue, compareValue);
+#if defined(_MSC_VER)
+        return (uint)_InterlockedCompareExchange(
+            reinterpret_cast<volatile long*>(pValue),
+            static_cast<long>(newValue),
+            static_cast<long>(compareValue));
+#else
+        __atomic_compare_exchange_n(
+            pValue, &compareValue, newValue, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+        return (uint)compareValue;
+#endif
     }
-
-    // Atomically read current *pValue
     static FM_FORCE_INLINE uint FmAtomicRead(uint* pValue)
     {
-        uint value = *(volatile unsigned long*)pValue;
-
-        // Ensure subsequent loads ordered after read of value
-        _mm_lfence();
-
-        return value;
+#if defined(_MSC_VER)
+        return (uint)_InterlockedCompareExchange(
+            reinterpret_cast<volatile long*>(pValue), 0, 0);
+#else
+        return (uint)__atomic_load_n(pValue, __ATOMIC_SEQ_CST);
+#endif
     }
-
-    // Atomically write to *pValue
     static FM_FORCE_INLINE uint FmAtomicWrite(uint* pValue, uint newValue)
     {
-        return InterlockedExchange((volatile unsigned long *)pValue, newValue);
-    }
+#if defined(_MSC_VER)
+        return (uint)_InterlockedExchange(
+            reinterpret_cast<volatile long*>(pValue), static_cast<long>(newValue));
+#else
+        return (uint)__atomic_exchange_n(pValue, newValue, __ATOMIC_SEQ_CST);
 #endif
+    }
 
     // Atomically compute max
     void FmAtomicMax(uint* pValue, uint newValue);

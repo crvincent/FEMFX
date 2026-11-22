@@ -1404,17 +1404,17 @@ template< class SoaNFloat > SOA_VECTORMATH_FORCE_INLINE const SoaPoint3<SoaNFloa
 
 template< class SoaNFloat > SOA_VECTORMATH_FORCE_INLINE void print( const SoaPoint3<SoaNFloat> & pnt )
 {
-    print(vec.getX(), "x");
-    print(vec.getY(), "y");
-    print(vec.getZ(), "z");
+    print(pnt.getX(), "x");
+    print(pnt.getY(), "y");
+    print(pnt.getZ(), "z");
 }
 
 template< class SoaNFloat > SOA_VECTORMATH_FORCE_INLINE void print( const SoaPoint3<SoaNFloat> & pnt, const char * name )
 {
     printf("%s:\n", name);
-    print(vec.getX(), "x");
-    print(vec.getY(), "y");
-    print(vec.getZ(), "z");
+    print(pnt.getX(), "x");
+    print(pnt.getY(), "y");
+    print(pnt.getZ(), "z");
 }
 
 #endif

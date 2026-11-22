@@ -27,24 +27,67 @@ THE SOFTWARE.
 #include <stddef.h>
 #include <stdint.h>
 #include <algorithm>
+#include <assert.h>
+
+#if defined(_WIN32) || defined(_WIN64)
+#define FM_PLATFORM_WINDOWS 1
+#elif defined(__APPLE__)
+#define FM_PLATFORM_MACOS 1
+#elif defined(__linux__) || defined(__unix__)
+#define FM_PLATFORM_LINUX 1
+#else
+#define FM_PLATFORM_UNKNOWN 1
+#endif
+
+#ifndef FM_FORCE_INLINE
+#if defined(_MSC_VER)
+#define FM_FORCE_INLINE __forceinline
+#elif defined(__GNUC__) || defined(__clang__)
+#define FM_FORCE_INLINE inline __attribute__((always_inline))
+#else
+#define FM_FORCE_INLINE inline
+#endif
+#endif
+
+#ifndef FM_RESTRICT
+#if defined(_MSC_VER)
+#define FM_RESTRICT __restrict
+#elif defined(__GNUC__) || defined(__clang__)
+#define FM_RESTRICT __restrict__
+#else
+#define FM_RESTRICT
+#endif
+#endif
+
+#ifndef FM_ALIGN_OF
+#if defined(_MSC_VER)
+#define FM_ALIGN_OF(x) __alignof(x)
+#else
+#define FM_ALIGN_OF(x) alignof(x)
+#endif
+#endif
+
+#ifndef FM_ALIGN
+#if defined(_MSC_VER)
+#define FM_ALIGN(x) __declspec(align(x))
+#else
+#define FM_ALIGN(x) alignas(x)
+#endif
+#endif
+
 #include "FEMFXVectorMath.h"
 
-#ifdef WIN32
-#define FM_FORCE_INLINE __forceinline
-#define FM_RESTRICT __restrict
-#define FM_ALIGN_OF(x) __alignof(x)
-#define FM_ALIGN(x) __declspec(align(x))
 #define FM_ALIGN_END(x)
+#if defined(_MSC_VER)
 #define FM_THREAD_LOCAL_STORAGE __declspec(thread)
 #else
-#error "Undefined"
+#define FM_THREAD_LOCAL_STORAGE thread_local
 #endif
 
 #ifdef _DEBUG
-#include <assert.h>
 #define FM_ASSERT(x) assert(x)
 #else
-#define FM_ASSERT(x)
+#define FM_ASSERT(x) ((void)0)
 #endif
 #define FM_STATIC_ASSERT(x) static_assert(x, #x)
 

@@ -31,7 +31,11 @@
 #define _SOA_UINT_H
 
 #include "vectormath_utils.h"
+#if defined(FEMFX_SIMD_SCALAR)
+#include "soa_scalar.h"
+#endif
 
+#if !defined(FEMFX_SIMD_SCALAR)
 namespace FmVectormath {
 
     class Soa4Float;
@@ -499,12 +503,12 @@ namespace FmVectormath {
 
     SIMD_VECTORMATH_FORCE_INLINE uint32_t Soa8Uint::getSlice(uint32_t idx) const
     {
-        return mData.m256i_i32[idx];
+        return (uint32_t)simd_getelem_epi32(mData, (int)idx);
     }
 
     SIMD_VECTORMATH_FORCE_INLINE void Soa8Uint::setSlice(uint32_t idx, uint32_t value)
     {
-        mData.m256i_i32[idx] = value;
+        simd_setelem_epi32(mData, (int32_t)value, (int)idx);
     }
 
     SIMD_VECTORMATH_FORCE_INLINE const Soa8Uint Soa8Uint::operator ++ (int)
@@ -647,5 +651,7 @@ namespace FmVectormath {
 #endif // SIMD_UTILS_USE_AVX
 
 } // namespace FmVectormath
+
+#endif // !FEMFX_SIMD_SCALAR
 
 #endif // _SOA_UINT_H

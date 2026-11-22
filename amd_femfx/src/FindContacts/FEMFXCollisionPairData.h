@@ -34,6 +34,7 @@ THE SOFTWARE.
 #include "FEMFXTriIntersection.h"
 #include "FEMFXTetMeshConnectivity.h"
 #include "FEMFXHashSet.h"
+#include <cstring>
 
 // Max object-pair surface-intersection contacts to limit performance impact.  
 // It's included to help constrain and push out small intersections.

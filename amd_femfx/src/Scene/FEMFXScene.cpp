@@ -32,6 +32,7 @@ THE SOFTWARE.
 #include "FEMFXThreadTempMemory.h"
 #include "FEMFXMpcgSolver.h"
 #include "FEMFXSleeping.h"
+#include <cstring>
 
 namespace AMD
 {

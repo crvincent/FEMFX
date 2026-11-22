@@ -32,6 +32,7 @@ THE SOFTWARE.
 #include "FEMFXConstraints.h"
 #include "FEMFXMpcgSolver.h"
 #include "FEMFXSerialize.h"
+#include <cstring>
 
 namespace AMD
 {

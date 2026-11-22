@@ -31,7 +31,11 @@
 #define _SOA_BOOL_H
 
 #include "vectormath_utils.h"
+#if defined(FEMFX_SIMD_SCALAR)
+#include "soa_scalar.h"
+#endif
 
+#if !defined(FEMFX_SIMD_SCALAR)
 namespace FmVectormath {
 
     class Soa4Float;
@@ -387,16 +391,9 @@ namespace FmVectormath {
             bool scalar0, bool scalar1, bool scalar2, bool scalar3,
             bool scalar4, bool scalar5, bool scalar6, bool scalar7)
     {
-        Simd256Union tmp;
-        tmp.vi.m256i_i32[0] = -((int)scalar0);
-        tmp.vi.m256i_i32[1] = -((int)scalar1);
-        tmp.vi.m256i_i32[2] = -((int)scalar2);
-        tmp.vi.m256i_i32[3] = -((int)scalar3);
-        tmp.vi.m256i_i32[4] = -((int)scalar4);
-        tmp.vi.m256i_i32[5] = -((int)scalar5);
-        tmp.vi.m256i_i32[6] = -((int)scalar6);
-        tmp.vi.m256i_i32[7] = -((int)scalar7);
-        mData = tmp.vf;
+            mData = _mm256_castsi256_ps(_mm256_setr_epi32(
+                -(int)scalar0, -(int)scalar1, -(int)scalar2, -(int)scalar3,
+                -(int)scalar4, -(int)scalar5, -(int)scalar6, -(int)scalar7));
     }
 
     SIMD_VECTORMATH_FORCE_INLINE Soa8Bool::Soa8Bool(const Soa8Float & vec)
@@ -430,14 +427,14 @@ namespace FmVectormath {
     {
         Simd256Union tmp;
         tmp.vf = mData;
-        return (bool)(tmp.vi.m256i_i32[idx] != 0);
+        return (bool)(simd_getelem_epi32(tmp.vi, (int)idx) != 0);
     }
 
     SIMD_VECTORMATH_FORCE_INLINE void Soa8Bool::setSlice(uint32_t idx, bool value)
     {
         Simd256Union tmp;
         tmp.vf = mData;
-        tmp.vi.m256i_i32[idx] = -(int)value;
+        simd_setelem_epi32(tmp.vi, -(int)value, (int)idx);
         mData = tmp.vf;
     }
 
@@ -512,5 +509,7 @@ namespace FmVectormath {
 #endif // SIMD_UTILS_USE_AVX
 
 } // namespace FmVectormath
+
+#endif // !FEMFX_SIMD_SCALAR
 
 #endif // _SOA_BOOL_H

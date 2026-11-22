@@ -30,6 +30,7 @@
 #ifndef _SIMD_BOOL_H
 #define _SIMD_BOOL_H
 
+#if !defined(FEMFX_SIMD_SCALAR)
 #include <math.h>
 
 namespace FmVectormath {
@@ -260,5 +261,7 @@ select(const SimdBool & vec0, const SimdBool & vec1, const SimdBool &select_vec1
 }
  
 } // namespace FmVectormath
+
+#endif // !FEMFX_SIMD_SCALAR
 
 #endif // SimdBool_h

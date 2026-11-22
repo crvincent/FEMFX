@@ -40,6 +40,20 @@ POSSIBILITY OF SUCH DAMAGE.
 #define SIMD_VECTORMATH_ALIGN16      SIMD_UTILS_ALIGN16
 #define SIMD_VECTORMATH_FORCE_INLINE SIMD_UTILS_FORCE_INLINE
 
+#if defined(FEMFX_SIMD_SCALAR)
+union SSEFloat
+{
+    FmSimdInt128 vi;
+    FmSimdFloat128 m128;
+    FmSimdFloat128 vf;
+    uint32_t ui[4];
+    uint16_t s[8];
+    float f[4];
+    SSEFloat(FmSimdFloat128 v) : m128(v) {}
+    SSEFloat(FmSimdInt128 v) : vi(v) {}
+    SSEFloat() {}
+};
+#else
 union SSEFloat
 {
     __m128i vi;
@@ -434,5 +448,7 @@ static SIMD_UTILS_FORCE_INLINE void simd_sincos_ps(__m256 x, __m256* s, __m256* 
     *c = simd_select_ps((__m256)_mm256_xor_ps(simd256_broadcast_ui_ps(0x80000000), (__m256)*c), *c, cosMask);
 }
 #endif
+
+#endif // FEMFX_SIMD_SCALAR
 
 #endif
