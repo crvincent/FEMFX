@@ -384,41 +384,41 @@ namespace AMD
 
         void ConvertAosToSoa(bool meshSupportsPlasticity)
         {
-            FmSetSoaFromAlignedAos(&input.deformedPosition0, aosDeformedPosition0);
-            FmSetSoaFromAlignedAos(&input.deformedPosition1, aosDeformedPosition1);
-            FmSetSoaFromAlignedAos(&input.deformedPosition2, aosDeformedPosition2);
-            FmSetSoaFromAlignedAos(&input.deformedPosition3, aosDeformedPosition3);
+            FmSetSoaFromHighwayAos<SoaTypes>(&input.deformedPosition0, aosDeformedPosition0);
+            FmSetSoaFromHighwayAos<SoaTypes>(&input.deformedPosition1, aosDeformedPosition1);
+            FmSetSoaFromHighwayAos<SoaTypes>(&input.deformedPosition2, aosDeformedPosition2);
+            FmSetSoaFromHighwayAos<SoaTypes>(&input.deformedPosition3, aosDeformedPosition3);
 
-            FmSetSoaFromAlignedAos(&input.restPosition0, aosRestPosition0);
-            FmSetSoaFromAlignedAos(&input.restPosition1, aosRestPosition1);
-            FmSetSoaFromAlignedAos(&input.restPosition2, aosRestPosition2);
-            FmSetSoaFromAlignedAos(&input.restPosition3, aosRestPosition3);
+            FmSetSoaFromHighwayAos<SoaTypes>(&input.restPosition0, aosRestPosition0);
+            FmSetSoaFromHighwayAos<SoaTypes>(&input.restPosition1, aosRestPosition1);
+            FmSetSoaFromHighwayAos<SoaTypes>(&input.restPosition2, aosRestPosition2);
+            FmSetSoaFromHighwayAos<SoaTypes>(&input.restPosition3, aosRestPosition3);
 
-            FmSetSoaFromAlignedAos(&input.stressRestPosition0, aosStressRestPosition0);
-            FmSetSoaFromAlignedAos(&input.stressRestPosition1, aosStressRestPosition1);
-            FmSetSoaFromAlignedAos(&input.stressRestPosition2, aosStressRestPosition2);
-            FmSetSoaFromAlignedAos(&input.stressRestPosition3, aosStressRestPosition3);
+            FmSetSoaFromHighwayAos<SoaTypes>(&input.stressRestPosition0, aosStressRestPosition0);
+            FmSetSoaFromHighwayAos<SoaTypes>(&input.stressRestPosition1, aosStressRestPosition1);
+            FmSetSoaFromHighwayAos<SoaTypes>(&input.stressRestPosition2, aosStressRestPosition2);
+            FmSetSoaFromHighwayAos<SoaTypes>(&input.stressRestPosition3, aosStressRestPosition3);
 
-            FmSetSoaFromAlignedAos(&input.shapeParams.baryMatrix.col0, aosShapeParamsBaryMatrixCol0);
-            FmSetSoaFromAlignedAos(&input.shapeParams.baryMatrix.col1, aosShapeParamsBaryMatrixCol1);
-            FmSetSoaFromAlignedAos(&input.shapeParams.baryMatrix.col2, aosShapeParamsBaryMatrixCol2);
-            FmSetSoaFromAlignedAos(&input.shapeParams.baryMatrix.col3, aosShapeParamsBaryMatrixCol3);
+            FmSetSoaFromHighwayAos<SoaTypes>(&input.shapeParams.baryMatrix.col0, aosShapeParamsBaryMatrixCol0);
+            FmSetSoaFromHighwayAos<SoaTypes>(&input.shapeParams.baryMatrix.col1, aosShapeParamsBaryMatrixCol1);
+            FmSetSoaFromHighwayAos<SoaTypes>(&input.shapeParams.baryMatrix.col2, aosShapeParamsBaryMatrixCol2);
+            FmSetSoaFromHighwayAos<SoaTypes>(&input.shapeParams.baryMatrix.col3, aosShapeParamsBaryMatrixCol3);
 
-            FmSetSoaFromAlignedAos(&input.stressShapeParams.baryMatrix.col0, aosStressShapeParamsBaryMatrixCol0);
-            FmSetSoaFromAlignedAos(&input.stressShapeParams.baryMatrix.col1, aosStressShapeParamsBaryMatrixCol1);
-            FmSetSoaFromAlignedAos(&input.stressShapeParams.baryMatrix.col2, aosStressShapeParamsBaryMatrixCol2);
-            FmSetSoaFromAlignedAos(&input.stressShapeParams.baryMatrix.col3, aosStressShapeParamsBaryMatrixCol3);
+            FmSetSoaFromHighwayAos<SoaTypes>(&input.stressShapeParams.baryMatrix.col0, aosStressShapeParamsBaryMatrixCol0);
+            FmSetSoaFromHighwayAos<SoaTypes>(&input.stressShapeParams.baryMatrix.col1, aosStressShapeParamsBaryMatrixCol1);
+            FmSetSoaFromHighwayAos<SoaTypes>(&input.stressShapeParams.baryMatrix.col2, aosStressShapeParamsBaryMatrixCol2);
+            FmSetSoaFromHighwayAos<SoaTypes>(&input.stressShapeParams.baryMatrix.col3, aosStressShapeParamsBaryMatrixCol3);
 
             if (meshSupportsPlasticity)
             {
-                FmSetSoaFromAlignedAos(&input.plasticDeformationMatrix.col0, aosPlasticDeformationMatrixCol0);
-                FmSetSoaFromAlignedAos(&input.plasticDeformationMatrix.col1, aosPlasticDeformationMatrixCol1);
-                FmSetSoaFromAlignedAos(&input.plasticDeformationMatrix.col2, aosPlasticDeformationMatrixCol2);
+                FmSetSoaFromHighwayAos<SoaTypes>(&input.plasticDeformationMatrix.col0, aosPlasticDeformationMatrixCol0);
+                FmSetSoaFromHighwayAos<SoaTypes>(&input.plasticDeformationMatrix.col1, aosPlasticDeformationMatrixCol1);
+                FmSetSoaFromHighwayAos<SoaTypes>(&input.plasticDeformationMatrix.col2, aosPlasticDeformationMatrixCol2);
 
 #if FM_COMPUTE_PLASTIC_REL_ROTATION            
-                FmSetSoaFromAlignedAos(&input.plasticTetRelRotation.col0, aosPlasticTetRelRotationCol0);
-                FmSetSoaFromAlignedAos(&input.plasticTetRelRotation.col1, aosPlasticTetRelRotationCol1);
-                FmSetSoaFromAlignedAos(&input.plasticTetRelRotation.col2, aosPlasticTetRelRotationCol2);
+                FmSetSoaFromHighwayAos<SoaTypes>(&input.plasticTetRelRotation.col0, aosPlasticTetRelRotationCol0);
+                FmSetSoaFromHighwayAos<SoaTypes>(&input.plasticTetRelRotation.col1, aosPlasticTetRelRotationCol1);
+                FmSetSoaFromHighwayAos<SoaTypes>(&input.plasticTetRelRotation.col2, aosPlasticTetRelRotationCol2);
 #endif
             }
         }

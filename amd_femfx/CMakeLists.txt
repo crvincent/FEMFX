@@ -1,5 +1,5 @@
-set(FEMFX_BACKEND "AUTO" CACHE STRING "FEMFX CPU math backend")
-set_property(CACHE FEMFX_BACKEND PROPERTY STRINGS AUTO SCALAR SSE2 AVX2)
+set(FEMFX_BACKEND "RUNTIME" CACHE STRING "FEMFX CPU math backend")
+set_property(CACHE FEMFX_BACKEND PROPERTY STRINGS RUNTIME SCALAR)
 set(FEMFX_EXPECT_ARM64 OFF CACHE BOOL "Require the configured target to be ARM64")
 
 if(NOT CMAKE_SYSTEM_PROCESSOR)
@@ -32,25 +32,17 @@ endif()
 string(TOUPPER "${FEMFX_BACKEND}" FEMFX_BACKEND)
 
 if(FEMFX_BACKEND STREQUAL "AUTO")
-    if(FEMFX_IS_ARM64)
-        set(FEMFX_BACKEND SCALAR)
-    else()
-        set(FEMFX_BACKEND SSE2)
-    endif()
+    set(FEMFX_BACKEND RUNTIME)
 endif()
 
-if(FEMFX_BACKEND STREQUAL "NEON")
-    message(FATAL_ERROR "FEMFX_BACKEND=NEON is not implemented yet. Use SCALAR for ARM64.")
-elseif(FEMFX_BACKEND STREQUAL "AVX2" OR FEMFX_BACKEND STREQUAL "SSE2")
-    if(NOT FEMFX_IS_X64)
-        message(FATAL_ERROR "FEMFX_BACKEND=${FEMFX_BACKEND} requires an x86/x64 target (got '${FEMFX_TARGET_PROCESSOR}')")
-    endif()
-elseif(NOT FEMFX_BACKEND STREQUAL "SCALAR")
-    message(FATAL_ERROR "Unsupported FEMFX_BACKEND '${FEMFX_BACKEND}'. Use AUTO, SCALAR, SSE2, AVX2, or NEON.")
+if(NOT FEMFX_BACKEND STREQUAL "RUNTIME" AND NOT FEMFX_BACKEND STREQUAL "SCALAR")
+    message(FATAL_ERROR "Unsupported FEMFX_BACKEND '${FEMFX_BACKEND}'. Use RUNTIME or SCALAR.")
 endif()
 
 file(GLOB_RECURSE FEMFX_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
+list(APPEND FEMFX_SOURCES "${PROJECT_SOURCE_DIR}/highway/hwy/targets.cc")
+list(APPEND FEMFX_SOURCES "${PROJECT_SOURCE_DIR}/highway/hwy/abort.cc")
 
 add_library(amd_femfx STATIC ${FEMFX_SOURCES})
 add_library(AMD::FEMFX ALIAS amd_femfx)
@@ -60,7 +52,7 @@ set_target_properties(amd_femfx PROPERTIES
     POSITION_INDEPENDENT_CODE ON
     EXPORT_NAME FEMFX)
 
-target_compile_features(amd_femfx PUBLIC cxx_std_14)
+target_compile_features(amd_femfx PUBLIC cxx_std_17)
 
 target_include_directories(amd_femfx
     PUBLIC
@@ -80,6 +72,8 @@ target_include_directories(amd_femfx
         "${CMAKE_CURRENT_SOURCE_DIR}/src/SparseSolvers"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/Threading"
         "${CMAKE_CURRENT_SOURCE_DIR}/inc/Vectormath")
+target_include_directories(amd_femfx PRIVATE
+    "${PROJECT_SOURCE_DIR}/highway")
 
 target_compile_definitions(amd_femfx
     PUBLIC
@@ -97,22 +91,10 @@ if(MSVC)
         /W4
         /EHsc
         /utf-8)
-    if(FEMFX_BACKEND STREQUAL "AVX2")
-        target_compile_options(amd_femfx PRIVATE /arch:AVX2)
-    elseif(FEMFX_BACKEND STREQUAL "SSE2")
-        if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
-            target_compile_options(amd_femfx PRIVATE /arch:SSE2)
-        endif()
-    endif()
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(amd_femfx PRIVATE
         -Wall
         -Wextra)
-    if(FEMFX_BACKEND STREQUAL "AVX2")
-        target_compile_options(amd_femfx PRIVATE -mavx2 -mfma)
-    elseif(FEMFX_BACKEND STREQUAL "SSE2")
-        target_compile_options(amd_femfx PRIVATE -msse2)
-    endif()
 endif()
 
 install(TARGETS amd_femfx
@@ -144,6 +126,19 @@ install(FILES
     "${CMAKE_CURRENT_BINARY_DIR}/AMD_FEMFXConfig.cmake"
     "${CMAKE_CURRENT_BINARY_DIR}/AMD_FEMFXConfigVersion.cmake"
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/AMD_FEMFX")
+
+install(FILES
+    "${PROJECT_SOURCE_DIR}/LICENSE.txt"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/AMD_FEMFX/licenses"
+    RENAME FEMFX-LICENSE.txt)
+install(FILES
+    "${PROJECT_SOURCE_DIR}/NOTICES.txt"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/AMD_FEMFX/licenses"
+    RENAME FEMFX-NOTICES.txt)
+install(FILES
+    "${PROJECT_SOURCE_DIR}/highway/LICENSE"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/AMD_FEMFX/licenses"
+    RENAME HIGHWAY-LICENSE.txt)
 
 message(STATUS "AMD FEMFX target processor: ${FEMFX_TARGET_PROCESSOR}")
 if(FEMFX_IS_ARM64)

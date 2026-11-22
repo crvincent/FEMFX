@@ -90,7 +90,7 @@ namespace AMD
 
     bool FmAabbCcd(float& impactTime, const FmAabb& aabb0, const FmAabb& aabb1, float deltaTime)
     {
-#if 0
+#if 1
         float proj01X = aabb0.pmin.x - aabb1.pmax.x;
         float proj01Y = aabb0.pmin.y - aabb1.pmax.y;
         float proj01Z = aabb0.pmin.z - aabb1.pmax.z;

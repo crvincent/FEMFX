@@ -1,6 +1,20 @@
 Notices and licenses file
 _________________________
 
+Component overview
+___________________
+
+AMD FEMFX is MIT licensed; see LICENSE.txt.
+
+Google Highway is included as the "highway" Git submodule and is dual-licensed
+under your choice of Apache License 2.0 or BSD 3-Clause. The pinned source
+and the complete applicable license text are in highway/LICENSE. Users do not
+need to change FEMFX's MIT license when selecting one of Highway's licenses;
+the selected Highway license governs the Highway component.
+
+The component notices below continue to apply to code retained or used from
+those components.
+
 erwincoumans-sce_vectormath v-u (BSD3) 
 Copyright (C) 2006, 2010 Sony Computer Entertainment Inc. 
 All rights reserved. 

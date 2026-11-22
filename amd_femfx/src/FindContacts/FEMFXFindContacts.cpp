@@ -36,10 +36,7 @@ THE SOFTWARE.
 #include "FEMFXSleeping.h"
 
 #if FM_SOA_TRI_INTERSECTION
-#include "FEMFXSoaTriIntersection.h"
-#endif
-#if FM_SOA_TRI_CCD
-#include "FEMFXSoaTriCcd.h"
+#include "FEMFXHighwayCollision.h"
 #endif
 
 using namespace AMD;
@@ -1132,214 +1129,89 @@ namespace AMD
     }
 
 #if FM_SOA_TRI_CCD
-    template<class SoaTypes>
     struct FmFeaturePairVFBatch
     {
-        FmMeshCollisionTriPair* triPair[SoaTypes::width];  // pointer to triangle pair data
-        uint numPairs;                              // number of pairs batched
-        FmSoaVFPairData<SoaTypes> pairData;
+        FmMeshCollisionTriPair* triPair[FM_HIGHWAY_COLLISION_BATCH_CAPACITY];
+        uint numPairs;
+        FmVertexFacePairData pairData[FM_HIGHWAY_COLLISION_BATCH_CAPACITY];
 
-        // AoS pair data
-        FM_ALIGN(16) FmVector3 vApos[SoaTypes::width] FM_ALIGN_END(16);
-        FM_ALIGN(16) FmVector3 vAvel[SoaTypes::width] FM_ALIGN_END(16);
-        FM_ALIGN(16) FmVector3 fBpos0[SoaTypes::width] FM_ALIGN_END(16);
-        FM_ALIGN(16) FmVector3 fBpos1[SoaTypes::width] FM_ALIGN_END(16);
-        FM_ALIGN(16) FmVector3 fBpos2[SoaTypes::width] FM_ALIGN_END(16);
-        FM_ALIGN(16) FmVector3 fBvel0[SoaTypes::width] FM_ALIGN_END(16);
-        FM_ALIGN(16) FmVector3 fBvel1[SoaTypes::width] FM_ALIGN_END(16);
-        FM_ALIGN(16) FmVector3 fBvel2[SoaTypes::width] FM_ALIGN_END(16);
-        uint i[SoaTypes::width];
-
-        FmFeaturePairVFBatch()
-        {
-            numPairs = 0;
-            for (uint sliceIdx = 0; sliceIdx < SoaTypes::width; sliceIdx++)
-            {
-                triPair[sliceIdx] = NULL;
-                vApos[sliceIdx] = FmInitVector3(0.0f);
-                vAvel[sliceIdx] = FmInitVector3(0.0f);
-                fBpos1[sliceIdx] = FmInitVector3(0.0f);
-                fBpos2[sliceIdx] = FmInitVector3(0.0f);
-                fBvel0[sliceIdx] = FmInitVector3(0.0f);
-                fBvel1[sliceIdx] = FmInitVector3(0.0f);
-                fBvel2[sliceIdx] = FmInitVector3(0.0f);
-                i[sliceIdx] = 0;
-            }
-        }
+        FmFeaturePairVFBatch() : numPairs(0) {}
     };
 
-    template<class SoaTypes>
     struct FmFeaturePairFVBatch
     {
-        FmMeshCollisionTriPair* triPair[SoaTypes::width];  // pointer to triangle pair data
-        uint numPairs;                              // number of pairs batched
-        FmSoaFVPairData<SoaTypes> pairData;
+        FmMeshCollisionTriPair* triPair[FM_HIGHWAY_COLLISION_BATCH_CAPACITY];
+        uint numPairs;
+        FmFaceVertexPairData pairData[FM_HIGHWAY_COLLISION_BATCH_CAPACITY];
 
-        // AoS pair data
-        FM_ALIGN(16) FmVector3 fApos0[SoaTypes::width] FM_ALIGN_END(16);
-        FM_ALIGN(16) FmVector3 fApos1[SoaTypes::width] FM_ALIGN_END(16);
-        FM_ALIGN(16) FmVector3 fApos2[SoaTypes::width] FM_ALIGN_END(16);
-        FM_ALIGN(16) FmVector3 fAvel0[SoaTypes::width] FM_ALIGN_END(16);
-        FM_ALIGN(16) FmVector3 fAvel1[SoaTypes::width] FM_ALIGN_END(16);
-        FM_ALIGN(16) FmVector3 fAvel2[SoaTypes::width] FM_ALIGN_END(16);
-        FM_ALIGN(16) FmVector3 vBpos[SoaTypes::width] FM_ALIGN_END(16);
-        FM_ALIGN(16) FmVector3 vBvel[SoaTypes::width] FM_ALIGN_END(16);
-        uint j[SoaTypes::width];
-
-        FmFeaturePairFVBatch()
-        {
-            numPairs = 0;
-            for (uint sliceIdx = 0; sliceIdx < SoaTypes::width; sliceIdx++)
-            {
-                triPair[sliceIdx] = NULL;
-                fApos0[sliceIdx] = FmInitVector3(0.0f);
-                fApos1[sliceIdx] = FmInitVector3(0.0f);
-                fApos2[sliceIdx] = FmInitVector3(0.0f);
-                fAvel0[sliceIdx] = FmInitVector3(0.0f);
-                fAvel1[sliceIdx] = FmInitVector3(0.0f);
-                fAvel2[sliceIdx] = FmInitVector3(0.0f);
-                vBpos[sliceIdx] = FmInitVector3(0.0f);
-                vBvel[sliceIdx] = FmInitVector3(0.0f);
-                j[sliceIdx] = 0;
-            }
-        }
-
+        FmFeaturePairFVBatch() : numPairs(0) {}
     };
 
-    template<class SoaTypes>
     struct FmFeaturePairEEBatch
     {
-        FmMeshCollisionTriPair* triPair[SoaTypes::width];  // pointer to triangle pair data
-        uint numPairs;                              // number of pairs batched
-        FmSoaEEPairData<SoaTypes> pairData;
+        FmMeshCollisionTriPair* triPair[FM_HIGHWAY_COLLISION_BATCH_CAPACITY];
+        uint numPairs;
+        FmEdgeEdgePairData pairData[FM_HIGHWAY_COLLISION_BATCH_CAPACITY];
 
-        // AoS pair data
-        FM_ALIGN(16) FmVector3 eApos0[SoaTypes::width] FM_ALIGN_END(16);
-        FM_ALIGN(16) FmVector3 eApos1[SoaTypes::width] FM_ALIGN_END(16);
-        FM_ALIGN(16) FmVector3 eAvel0[SoaTypes::width] FM_ALIGN_END(16);
-        FM_ALIGN(16) FmVector3 eAvel1[SoaTypes::width] FM_ALIGN_END(16);
-        FM_ALIGN(16) FmVector3 eBpos0[SoaTypes::width] FM_ALIGN_END(16);
-        FM_ALIGN(16) FmVector3 eBpos1[SoaTypes::width] FM_ALIGN_END(16);
-        FM_ALIGN(16) FmVector3 eBvel0[SoaTypes::width] FM_ALIGN_END(16);
-        FM_ALIGN(16) FmVector3 eBvel1[SoaTypes::width] FM_ALIGN_END(16);
-        uint i[SoaTypes::width];
-        uint j[SoaTypes::width];
-
-        FmFeaturePairEEBatch()
-        {
-            numPairs = 0;
-            for (uint sliceIdx = 0; sliceIdx < SoaTypes::width; sliceIdx++)
-            {
-                triPair[sliceIdx] = NULL;
-                eApos0[sliceIdx] = FmInitVector3(0.0f);
-                eApos1[sliceIdx] = FmInitVector3(0.0f);
-                eAvel0[sliceIdx] = FmInitVector3(0.0f);
-                eAvel1[sliceIdx] = FmInitVector3(0.0f);
-                eBpos0[sliceIdx] = FmInitVector3(0.0f);
-                eBpos1[sliceIdx] = FmInitVector3(0.0f);
-                eBvel0[sliceIdx] = FmInitVector3(0.0f);
-                eBvel1[sliceIdx] = FmInitVector3(0.0f);
-                i[sliceIdx] = 0;
-                j[sliceIdx] = 0;
-            }
-        }
+        FmFeaturePairEEBatch() : numPairs(0) {}
     };
 
-    template<class SoaTypes>
     void FmProcessVFBatch(
         FmCollidedObjectPair* collidedPair,
-        FmFeaturePairVFBatch<SoaTypes>& vfBatch,
-        const FmSoaCcdTerminationConditions<SoaTypes>& soaConditions)
+        FmFeaturePairVFBatch& vfBatch,
+        const FmCcdTerminationConditions& conditions)
     {
-        FmSoaCcdResult<SoaTypes> result;
-
-        FmSetSoaFromAlignedAos(&vfBatch.pairData.vApos, vfBatch.vApos);
-        FmSetSoaFromAlignedAos(&vfBatch.pairData.vAvel, vfBatch.vAvel);
-        FmSetSoaFromAlignedAos(&vfBatch.pairData.fBpos[0], vfBatch.fBpos0);
-        FmSetSoaFromAlignedAos(&vfBatch.pairData.fBpos[1], vfBatch.fBpos1);
-        FmSetSoaFromAlignedAos(&vfBatch.pairData.fBpos[2], vfBatch.fBpos2);
-        FmSetSoaFromAlignedAos(&vfBatch.pairData.fBvel[0], vfBatch.fBvel0);
-        FmSetSoaFromAlignedAos(&vfBatch.pairData.fBvel[1], vfBatch.fBvel1);
-        FmSetSoaFromAlignedAos(&vfBatch.pairData.fBvel[2], vfBatch.fBvel2);
-        vfBatch.pairData.i = typename SoaTypes::SoaUint(vfBatch.i);
-
-        FmVertexFaceCcd(&result, vfBatch.pairData, collidedPair->timestep, soaConditions);
+        FmCcdResult results[FM_HIGHWAY_COLLISION_BATCH_CAPACITY];
+        FmHighwayVertexFaceCcdBatch(
+            results, vfBatch.pairData, collidedPair->timestep,
+            conditions, vfBatch.numPairs);
 
         for (uint idx = 0; idx < vfBatch.numPairs; idx++)
         {
-            FmCcdResult contact;
-            FmGetSlice(&contact, result, idx);
-
+            const FmCcdResult& contact = results[idx];
             if (FmAcceptCcdContact(contact, collidedPair->distContactThreshold) && contact.featurePair.jtype == FM_FEATURE_TYPE_FACE)
             {
                 FmFinalizeDistanceContact(collidedPair, *vfBatch.triPair[idx], contact);
             }
         }
-
         vfBatch.numPairs = 0;
     }
 
-    template<class SoaTypes>
     void FmProcessFVBatch(
         FmCollidedObjectPair* collidedPair,
-        FmFeaturePairFVBatch<SoaTypes>& fvBatch,
-        const FmSoaCcdTerminationConditions<SoaTypes>& soaConditions)
+        FmFeaturePairFVBatch& fvBatch,
+        const FmCcdTerminationConditions& conditions)
     {
-        FmSoaCcdResult<SoaTypes> result;
-
-        FmSetSoaFromAlignedAos(&fvBatch.pairData.fApos[0], fvBatch.fApos0);
-        FmSetSoaFromAlignedAos(&fvBatch.pairData.fApos[1], fvBatch.fApos1);
-        FmSetSoaFromAlignedAos(&fvBatch.pairData.fApos[2], fvBatch.fApos2);
-        FmSetSoaFromAlignedAos(&fvBatch.pairData.fAvel[0], fvBatch.fAvel0);
-        FmSetSoaFromAlignedAos(&fvBatch.pairData.fAvel[1], fvBatch.fAvel1);
-        FmSetSoaFromAlignedAos(&fvBatch.pairData.fAvel[2], fvBatch.fAvel2);
-        FmSetSoaFromAlignedAos(&fvBatch.pairData.vBpos, fvBatch.vBpos);
-        FmSetSoaFromAlignedAos(&fvBatch.pairData.vBvel, fvBatch.vBvel);
-        fvBatch.pairData.j = typename SoaTypes::SoaUint(fvBatch.j);
-
-        FmFaceVertexCcd(&result, fvBatch.pairData, collidedPair->timestep, soaConditions);
+        FmCcdResult results[FM_HIGHWAY_COLLISION_BATCH_CAPACITY];
+        FmHighwayFaceVertexCcdBatch(
+            results, fvBatch.pairData, collidedPair->timestep,
+            conditions, fvBatch.numPairs);
 
         for (uint idx = 0; idx < fvBatch.numPairs; idx++)
         {
-            FmCcdResult contact;
-            FmGetSlice(&contact, result, idx);
-
+            const FmCcdResult& contact = results[idx];
             if (FmAcceptCcdContact(contact, collidedPair->distContactThreshold) && contact.featurePair.itype == FM_FEATURE_TYPE_FACE)
             {
                 FmFinalizeDistanceContact(collidedPair, *fvBatch.triPair[idx], contact);
             }
         }
-
         fvBatch.numPairs = 0;
     }
 
-    template<class SoaTypes>
     void FmProcessEEBatch(
         FmCollidedObjectPair* collidedPair,
-        FmFeaturePairEEBatch<SoaTypes>& eeBatch,
-        const FmSoaCcdTerminationConditions<SoaTypes>& soaConditions)
+        FmFeaturePairEEBatch& eeBatch,
+        const FmCcdTerminationConditions& conditions)
     {
-        FmSoaCcdResult<SoaTypes> result;
-
-        FmSetSoaFromAlignedAos(&eeBatch.pairData.eApos[0], eeBatch.eApos0);
-        FmSetSoaFromAlignedAos(&eeBatch.pairData.eApos[1], eeBatch.eApos1);
-        FmSetSoaFromAlignedAos(&eeBatch.pairData.eAvel[0], eeBatch.eAvel0);
-        FmSetSoaFromAlignedAos(&eeBatch.pairData.eAvel[1], eeBatch.eAvel1);
-        FmSetSoaFromAlignedAos(&eeBatch.pairData.eBpos[0], eeBatch.eBpos0);
-        FmSetSoaFromAlignedAos(&eeBatch.pairData.eBpos[1], eeBatch.eBpos1);
-        FmSetSoaFromAlignedAos(&eeBatch.pairData.eBvel[0], eeBatch.eBvel0);
-        FmSetSoaFromAlignedAos(&eeBatch.pairData.eBvel[1], eeBatch.eBvel1);
-        eeBatch.pairData.i = typename SoaTypes::SoaUint(eeBatch.i);
-        eeBatch.pairData.j = typename SoaTypes::SoaUint(eeBatch.j);
-
-        FmEdgeEdgeCcd(&result, eeBatch.pairData, collidedPair->timestep, soaConditions);
+        FmCcdResult results[FM_HIGHWAY_COLLISION_BATCH_CAPACITY];
+        FmHighwayEdgeEdgeCcdBatch(
+            results, eeBatch.pairData, collidedPair->timestep,
+            conditions, eeBatch.numPairs);
 
         for (uint idx = 0; idx < eeBatch.numPairs; idx++)
         {
             FmMeshCollisionTriPair& pair = *eeBatch.triPair[idx];
-
-            FmCcdResult contact;
-            FmGetSlice(&contact, result, idx);
+            const FmCcdResult& contact = results[idx];
 
             if (FmAcceptCcdContact(contact, collidedPair->distContactThreshold) &&
                 !((contact.featurePair.itype == FM_FEATURE_TYPE_VERTEX && !pair.triA.OwnsVert(contact.featurePair.i0))
@@ -1347,7 +1219,6 @@ namespace AMD
                     (contact.featurePair.jtype == FM_FEATURE_TYPE_VERTEX && !pair.triB.OwnsVert(contact.featurePair.j0))))
             {
                 uint bit = 1UL << (contact.featurePair.i0 * 3 + contact.featurePair.j0);
-
                 uint found = 0;
                 if (contact.featurePair.itype == FM_FEATURE_TYPE_VERTEX && contact.featurePair.jtype == FM_FEATURE_TYPE_VERTEX)
                 {
@@ -1371,17 +1242,15 @@ namespace AMD
                 }
             }
         }
-
         eeBatch.numPairs = 0;
     }
 
-    template<class SoaTypes>
     void FmGenerateCcdContacts(
         FmCollidedObjectPair* collidedPair,
         FmMeshCollisionTriPair& triPair,
-        FmFeaturePairVFBatch<SoaTypes>& vfBatch,
-        FmFeaturePairFVBatch<SoaTypes>& fvBatch,
-        FmFeaturePairEEBatch<SoaTypes>& eeBatch)
+        FmFeaturePairVFBatch& vfBatch,
+        FmFeaturePairFVBatch& fvBatch,
+        FmFeaturePairEEBatch& eeBatch)
     {
         FmTetMesh* meshA = collidedPair->tetMeshA;
         FmTetMesh* meshB = collidedPair->tetMeshB;
@@ -1390,127 +1259,95 @@ namespace AMD
         uint meshIdA = meshA->objectId;
         uint meshIdB = meshB->objectId;
 
-        // Perform CCD checks with features of triangles
-        FmSoaCcdTerminationConditions<SoaTypes> soaConditions;
-        soaConditions.impactGap = distContactBias;
-        soaConditions.contactGap = distContactThreshold;
-        soaConditions.maxIterations = 4;
+        FmCcdTerminationConditions conditions;
+        conditions.impactGap = distContactBias;
+        conditions.contactGap = distContactThreshold;
+        conditions.maxIterations = 4;
 
-        // Zero found flags for CCD
         triPair.vertVertFound = 0;
         triPair.vertEdgeFound = 0;
         triPair.edgeVertFound = 0;
 
         for (uint i = 0; i < 3; i++)
         {
-            // Vertex/face pairs
-
-            // If self-collision, skip feature pair with incident verts
             bool incidentVerts = (meshIdA == meshIdB &&
                 (triPair.faceVertIdsA.ids[i] == triPair.faceVertIdsB.ids[0] ||
                     triPair.faceVertIdsA.ids[i] == triPair.faceVertIdsB.ids[1] ||
                     triPair.faceVertIdsA.ids[i] == triPair.faceVertIdsB.ids[2]));
 
-            if (triPair.triA.OwnsVert(i)
-                && !incidentVerts
-                && dot(triPair.triA.Pos(i) - triPair.triB.pos0, cross(triPair.triB.pos1 - triPair.triB.pos0, triPair.triB.pos2 - triPair.triB.pos0)) > 0.0f // test vert on outside side
-                )
+            if (triPair.triA.OwnsVert(i) && !incidentVerts &&
+                dot(triPair.triA.Pos(i) - triPair.triB.pos0,
+                    cross(triPair.triB.pos1 - triPair.triB.pos0,
+                        triPair.triB.pos2 - triPair.triB.pos0)) > 0.0f)
             {
-                uint sliceIdx = vfBatch.numPairs;
-
-                vfBatch.vApos[sliceIdx] = triPair.triA.Pos(i);
-                vfBatch.vAvel[sliceIdx] = triPair.triA.Vel(i);
-                vfBatch.fBpos0[sliceIdx] = triPair.triB.Pos(0);
-                vfBatch.fBvel0[sliceIdx] = triPair.triB.Vel(0);
-                vfBatch.fBpos1[sliceIdx] = triPair.triB.Pos(1);
-                vfBatch.fBvel1[sliceIdx] = triPair.triB.Vel(1);
-                vfBatch.fBpos2[sliceIdx] = triPair.triB.Pos(2);
-                vfBatch.fBvel2[sliceIdx] = triPair.triB.Vel(2);
-                vfBatch.i[sliceIdx] = i;
-
-                vfBatch.triPair[vfBatch.numPairs] = &triPair;
-                vfBatch.numPairs++;
-
-                if (vfBatch.numPairs == SoaTypes::width)
+                FmVertexFacePairData& pair = vfBatch.pairData[vfBatch.numPairs];
+                pair.vApos = triPair.triA.Pos(i);
+                pair.vAvel = triPair.triA.Vel(i);
+                for (uint v = 0; v < 3; v++)
                 {
-                    FmProcessVFBatch(collidedPair, vfBatch, soaConditions);
+                    pair.fBpos[v] = triPair.triB.Pos(v);
+                    pair.fBvel[v] = triPair.triB.Vel(v);
                 }
+                pair.i = i;
+                vfBatch.triPair[vfBatch.numPairs++] = &triPair;
+                if (vfBatch.numPairs == FM_HIGHWAY_COLLISION_BATCH_CAPACITY)
+                    FmProcessVFBatch(collidedPair, vfBatch, conditions);
             }
-
-            // Face/vertex pairs
 
             incidentVerts = (meshIdA == meshIdB &&
                 (triPair.faceVertIdsB.ids[i] == triPair.faceVertIdsA.ids[0] ||
                     triPair.faceVertIdsB.ids[i] == triPair.faceVertIdsA.ids[1] ||
                     triPair.faceVertIdsB.ids[i] == triPair.faceVertIdsA.ids[2]));
 
-            if (triPair.triB.OwnsVert(i)
-                && !incidentVerts
-                && dot(triPair.triB.Pos(i) - triPair.triA.pos0, cross(triPair.triA.pos1 - triPair.triA.pos0, triPair.triA.pos2 - triPair.triA.pos0)) > 0.0f // test vert on outside side
-                )
+            if (triPair.triB.OwnsVert(i) && !incidentVerts &&
+                dot(triPair.triB.Pos(i) - triPair.triA.pos0,
+                    cross(triPair.triA.pos1 - triPair.triA.pos0,
+                        triPair.triA.pos2 - triPair.triA.pos0)) > 0.0f)
             {
-                uint sliceIdx = fvBatch.numPairs;
-
-                fvBatch.fApos0[sliceIdx] = triPair.triA.Pos(0);
-                fvBatch.fAvel0[sliceIdx] = triPair.triA.Vel(0);
-                fvBatch.fApos1[sliceIdx] = triPair.triA.Pos(1);
-                fvBatch.fAvel1[sliceIdx] = triPair.triA.Vel(1);
-                fvBatch.fApos2[sliceIdx] = triPair.triA.Pos(2);
-                fvBatch.fAvel2[sliceIdx] = triPair.triA.Vel(2);
-                fvBatch.vBpos[sliceIdx] = triPair.triB.Pos(i);
-                fvBatch.vBvel[sliceIdx] = triPair.triB.Vel(i);
-                fvBatch.j[sliceIdx] = i;
-
-                fvBatch.triPair[fvBatch.numPairs] = &triPair;
-                fvBatch.numPairs++;
-
-                if (fvBatch.numPairs == SoaTypes::width)
+                FmFaceVertexPairData& pair = fvBatch.pairData[fvBatch.numPairs];
+                for (uint v = 0; v < 3; v++)
                 {
-                    FmProcessFVBatch(collidedPair, fvBatch, soaConditions);
+                    pair.fApos[v] = triPair.triA.Pos(v);
+                    pair.fAvel[v] = triPair.triA.Vel(v);
                 }
+                pair.vBpos = triPair.triB.Pos(i);
+                pair.vBvel = triPair.triB.Vel(i);
+                pair.j = i;
+                fvBatch.triPair[fvBatch.numPairs++] = &triPair;
+                if (fvBatch.numPairs == FM_HIGHWAY_COLLISION_BATCH_CAPACITY)
+                    FmProcessFVBatch(collidedPair, fvBatch, conditions);
             }
 
-            // Edge/edge pairs
-
             uint i1 = (i + 1) % 3;
-
             for (uint j = 0; j < 3; j++)
             {
                 uint j1 = (j + 1) % 3;
-
                 incidentVerts = (meshIdA == meshIdB &&
                     (triPair.faceVertIdsA.ids[i] == triPair.faceVertIdsB.ids[j] ||
                         triPair.faceVertIdsA.ids[i] == triPair.faceVertIdsB.ids[j1] ||
                         triPair.faceVertIdsA.ids[i1] == triPair.faceVertIdsB.ids[j] ||
                         triPair.faceVertIdsA.ids[i1] == triPair.faceVertIdsB.ids[j1]));
+                bool edgeIntersectsFace = triPair.pairIntersects &&
+                    (triPair.triIntersectionPoints.XVals[i] != 0 ||
+                        triPair.triIntersectionPoints.XVals[j + 3] != 0);
 
-                // only test if edges not already intersecting with face
-                bool edgeIntersectsFace = triPair.pairIntersects && (triPair.triIntersectionPoints.XVals[i] != 0 || triPair.triIntersectionPoints.XVals[j + 3] != 0);
-
-                if (triPair.triA.OwnsEdge(i) && triPair.triB.OwnsEdge(j)           // only one tri pair will test this edge pair
-                    && !incidentVerts
-                    && !edgeIntersectsFace)
+                if (triPair.triA.OwnsEdge(i) && triPair.triB.OwnsEdge(j) &&
+                    !incidentVerts && !edgeIntersectsFace)
                 {
-                    uint sliceIdx = eeBatch.numPairs;
-
-                    eeBatch.eApos0[sliceIdx] = triPair.triA.Pos(i);
-                    eeBatch.eAvel0[sliceIdx] = triPair.triA.Vel(i);
-                    eeBatch.eApos1[sliceIdx] = triPair.triA.Pos(i1);
-                    eeBatch.eAvel1[sliceIdx] = triPair.triA.Vel(i1);
-                    eeBatch.eBpos0[sliceIdx] = triPair.triB.Pos(j);
-                    eeBatch.eBvel0[sliceIdx] = triPair.triB.Vel(j);
-                    eeBatch.eBpos1[sliceIdx] = triPair.triB.Pos(j1);
-                    eeBatch.eBvel1[sliceIdx] = triPair.triB.Vel(j1);
-                    eeBatch.i[sliceIdx] = i;
-                    eeBatch.j[sliceIdx] = j;
-
-                    eeBatch.triPair[eeBatch.numPairs] = &triPair;
-                    eeBatch.numPairs++;
-
-                    if (eeBatch.numPairs == SoaTypes::width)
-                    {
-                        FmProcessEEBatch(collidedPair, eeBatch, soaConditions);
-                    }
+                    FmEdgeEdgePairData& pair = eeBatch.pairData[eeBatch.numPairs];
+                    pair.eApos[0] = triPair.triA.Pos(i);
+                    pair.eAvel[0] = triPair.triA.Vel(i);
+                    pair.eApos[1] = triPair.triA.Pos(i1);
+                    pair.eAvel[1] = triPair.triA.Vel(i1);
+                    pair.eBpos[0] = triPair.triB.Pos(j);
+                    pair.eBvel[0] = triPair.triB.Vel(j);
+                    pair.eBpos[1] = triPair.triB.Pos(j1);
+                    pair.eBvel[1] = triPair.triB.Vel(j1);
+                    pair.i = i;
+                    pair.j = j;
+                    eeBatch.triPair[eeBatch.numPairs++] = &triPair;
+                    if (eeBatch.numPairs == FM_HIGHWAY_COLLISION_BATCH_CAPACITY)
+                        FmProcessEEBatch(collidedPair, eeBatch, conditions);
                 }
             }
         }
@@ -1690,40 +1527,18 @@ namespace AMD
         }
 #else
 
-        typedef FmSoaTypes SoaTypes;
-
         FmTetMesh* meshA = objectPair->tetMeshA;
         FmTetMesh* meshB = objectPair->tetMeshB;
         FmVolumeContactWorkspace* volContactWorkspace = objectPair->temps.volContactWorkspace;
         FmVector3 volContactCenter = objectPair->volContactCenter;
 
-        // Traverse mesh collision pairs and gather groups for SoA processing
-        FmSoaTriIntersectionPoints<SoaTypes> soaTriIntersectionPoints;
-        SoaTypes::SoaVector3 soaTriPosA[3];
-        SoaTypes::SoaVector3 soaTriPosB[3];
-        soaTriPosA[0] = soaTriPosA[1] = soaTriPosA[2] = SoaTypes::SoaVector3(0.0f);
-        soaTriPosB[0] = soaTriPosB[1] = soaTriPosB[2] = SoaTypes::SoaVector3(0.0f);
-        FM_ALIGN(16) FmVector3 aosTriPosA0[SoaTypes::width] FM_ALIGN_END(16);
-        FM_ALIGN(16) FmVector3 aosTriPosA1[SoaTypes::width] FM_ALIGN_END(16);
-        FM_ALIGN(16) FmVector3 aosTriPosA2[SoaTypes::width] FM_ALIGN_END(16);
-        FM_ALIGN(16) FmVector3 aosTriPosB0[SoaTypes::width] FM_ALIGN_END(16);
-        FM_ALIGN(16) FmVector3 aosTriPosB1[SoaTypes::width] FM_ALIGN_END(16);
-        FM_ALIGN(16) FmVector3 aosTriPosB2[SoaTypes::width] FM_ALIGN_END(16);
-
-        uint groupPairIndices[SoaTypes::width];
-        bool groupPairIntersects[SoaTypes::width];
-        FmTriIntersectionPoints* groupTriIntersectionPoints[SoaTypes::width];
+        // Gather fixed-size batches independently of the selected Highway target.
+        FmVector3 groupTriPosA[FM_HIGHWAY_COLLISION_BATCH_CAPACITY][3];
+        FmVector3 groupTriPosB[FM_HIGHWAY_COLLISION_BATCH_CAPACITY][3];
+        uint groupPairIndices[FM_HIGHWAY_COLLISION_BATCH_CAPACITY];
+        bool groupPairIntersects[FM_HIGHWAY_COLLISION_BATCH_CAPACITY];
+        FmTriIntersectionPoints groupTriIntersectionPoints[FM_HIGHWAY_COLLISION_BATCH_CAPACITY];
         uint groupNumPairs = 0;
-
-        for (uint sliceIdx = 0; sliceIdx < SoaTypes::width; sliceIdx++)
-        {
-            aosTriPosA0[sliceIdx] = FmInitVector3(0.0f);
-            aosTriPosA1[sliceIdx] = FmInitVector3(0.0f);
-            aosTriPosA2[sliceIdx] = FmInitVector3(0.0f);
-            aosTriPosB0[sliceIdx] = FmInitVector3(0.0f);
-            aosTriPosB1[sliceIdx] = FmInitVector3(0.0f);
-            aosTriPosB2[sliceIdx] = FmInitVector3(0.0f);
-        }
 
         for (uint pairIdx = 0; pairIdx < objectPair->temps.numMeshCollisionTriPairs; pairIdx++)
         {
@@ -1813,30 +1628,27 @@ namespace AMD
                 )
             {
                 groupPairIndices[groupNumPairs] = pairIdx;
-                groupTriIntersectionPoints[groupNumPairs] = &triPair.triIntersectionPoints;
-                aosTriPosA0[groupNumPairs] = triPair.triA.pos0;
-                aosTriPosA1[groupNumPairs] = triPair.triA.pos1;
-                aosTriPosA2[groupNumPairs] = triPair.triA.pos2;
-                aosTriPosB0[groupNumPairs] = triPair.triB.pos0;
-                aosTriPosB1[groupNumPairs] = triPair.triB.pos1;
-                aosTriPosB2[groupNumPairs] = triPair.triB.pos2;
+                groupTriPosA[groupNumPairs][0] = triPair.triA.pos0;
+                groupTriPosA[groupNumPairs][1] = triPair.triA.pos1;
+                groupTriPosA[groupNumPairs][2] = triPair.triA.pos2;
+                groupTriPosB[groupNumPairs][0] = triPair.triB.pos0;
+                groupTriPosB[groupNumPairs][1] = triPair.triB.pos1;
+                groupTriPosB[groupNumPairs][2] = triPair.triB.pos2;
                 groupNumPairs++;
 
-                if (groupNumPairs >= SoaTypes::width)
+                if (groupNumPairs >= FM_HIGHWAY_COLLISION_BATCH_CAPACITY)
                 {
-                    FmSetSoaFromAlignedAos(&soaTriPosA[0], aosTriPosA0);
-                    FmSetSoaFromAlignedAos(&soaTriPosA[1], aosTriPosA1);
-                    FmSetSoaFromAlignedAos(&soaTriPosA[2], aosTriPosA2);
-                    FmSetSoaFromAlignedAos(&soaTriPosB[0], aosTriPosB0);
-                    FmSetSoaFromAlignedAos(&soaTriPosB[1], aosTriPosB1);
-                    FmSetSoaFromAlignedAos(&soaTriPosB[2], aosTriPosB2);
-
-                    SoaTypes::SoaBool soaPairIntersects = FmComputeTriIntersection<SoaTypes>(&soaTriIntersectionPoints, soaTriPosA, soaTriPosB);
-                    FmConvertSoaToAos(groupPairIntersects, groupTriIntersectionPoints, soaPairIntersects, soaTriIntersectionPoints, groupNumPairs);
+                    FmHighwayTriIntersectionBatch(
+                        groupPairIntersects, groupTriIntersectionPoints,
+                        &groupTriPosA[0][0], &groupTriPosB[0][0], groupNumPairs);
                     for (uint i = 0; i < groupNumPairs; i++)
                     {
                         FmMeshCollisionTriPair& groupPair = objectPair->temps.meshCollisionTriPairs[groupPairIndices[i]];
                         groupPair.pairIntersects = groupPairIntersects[i];
+                        if (groupPairIntersects[i])
+                        {
+                            groupPair.triIntersectionPoints = groupTriIntersectionPoints[i];
+                        }
                     }
 
                     groupNumPairs = 0;
@@ -1846,29 +1658,26 @@ namespace AMD
 
         if (groupNumPairs > 0)
         {
-            FmSetSoaFromAlignedAos(&soaTriPosA[0], aosTriPosA0);
-            FmSetSoaFromAlignedAos(&soaTriPosA[1], aosTriPosA1);
-            FmSetSoaFromAlignedAos(&soaTriPosA[2], aosTriPosA2);
-            FmSetSoaFromAlignedAos(&soaTriPosB[0], aosTriPosB0);
-            FmSetSoaFromAlignedAos(&soaTriPosB[1], aosTriPosB1);
-            FmSetSoaFromAlignedAos(&soaTriPosB[2], aosTriPosB2);
-
-            SoaTypes::SoaBool soaPairIntersects = FmComputeTriIntersection<SoaTypes>(&soaTriIntersectionPoints, soaTriPosA, soaTriPosB);
-            FmConvertSoaToAos(groupPairIntersects, groupTriIntersectionPoints, soaPairIntersects, soaTriIntersectionPoints, groupNumPairs);
+            FmHighwayTriIntersectionBatch(
+                groupPairIntersects, groupTriIntersectionPoints,
+                &groupTriPosA[0][0], &groupTriPosB[0][0], groupNumPairs);
             for (uint i = 0; i < groupNumPairs; i++)
             {
                 FmMeshCollisionTriPair& groupPair = objectPair->temps.meshCollisionTriPairs[groupPairIndices[i]];
                 groupPair.pairIntersects = groupPairIntersects[i];
+                if (groupPairIntersects[i])
+                {
+                    groupPair.triIntersectionPoints = groupTriIntersectionPoints[i];
+                }
             }
 
             groupNumPairs = 0;
         }
 
 #if FM_SOA_TRI_CCD
-        typedef FmSoaTypes CcdSoaTypes;
-        FmFeaturePairVFBatch<CcdSoaTypes> vfBatch;
-        FmFeaturePairFVBatch<CcdSoaTypes> fvBatch;
-        FmFeaturePairEEBatch<CcdSoaTypes> eeBatch;
+        FmFeaturePairVFBatch vfBatch;
+        FmFeaturePairFVBatch fvBatch;
+        FmFeaturePairEEBatch eeBatch;
 
         bool isSelfCollision = (meshA == meshB);
         uint numTriPairs = objectPair->temps.numMeshCollisionTriPairs;
@@ -1907,24 +1716,24 @@ namespace AMD
             }
         }
 
-        FmSoaCcdTerminationConditions<CcdSoaTypes> soaConditions;
-        soaConditions.impactGap = objectPair->distContactBias;
-        soaConditions.contactGap = objectPair->distContactThreshold;
-        soaConditions.maxIterations = 4;
+        FmCcdTerminationConditions conditions;
+        conditions.impactGap = objectPair->distContactBias;
+        conditions.contactGap = objectPair->distContactThreshold;
+        conditions.maxIterations = 4;
 
         if (vfBatch.numPairs)
         {
-            FmProcessVFBatch(objectPair, vfBatch, soaConditions);
+            FmProcessVFBatch(objectPair, vfBatch, conditions);
         }
 
         if (fvBatch.numPairs)
         {
-            FmProcessFVBatch(objectPair, fvBatch, soaConditions);
+            FmProcessFVBatch(objectPair, fvBatch, conditions);
         }
 
         if (eeBatch.numPairs)
         {
-            FmProcessEEBatch(objectPair, eeBatch, soaConditions);
+            FmProcessEEBatch(objectPair, eeBatch, conditions);
         }
 
 #else

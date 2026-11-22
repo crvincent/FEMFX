@@ -231,14 +231,14 @@ namespace AMD
 
         void ConvertAosToSoa()
         {
-            FmSetSoaFromAlignedAos(&stressShapeParams.baryMatrix.col0, aosStressShapeParamsBaryMatrixCol0);
-            FmSetSoaFromAlignedAos(&stressShapeParams.baryMatrix.col1, aosStressShapeParamsBaryMatrixCol1);
-            FmSetSoaFromAlignedAos(&stressShapeParams.baryMatrix.col2, aosStressShapeParamsBaryMatrixCol2);
-            FmSetSoaFromAlignedAos(&stressShapeParams.baryMatrix.col3, aosStressShapeParamsBaryMatrixCol3);
+            FmSetSoaFromHighwayAos<SoaTypes>(&stressShapeParams.baryMatrix.col0, aosStressShapeParamsBaryMatrixCol0);
+            FmSetSoaFromHighwayAos<SoaTypes>(&stressShapeParams.baryMatrix.col1, aosStressShapeParamsBaryMatrixCol1);
+            FmSetSoaFromHighwayAos<SoaTypes>(&stressShapeParams.baryMatrix.col2, aosStressShapeParamsBaryMatrixCol2);
+            FmSetSoaFromHighwayAos<SoaTypes>(&stressShapeParams.baryMatrix.col3, aosStressShapeParamsBaryMatrixCol3);
 
-            FmSetSoaFromAlignedAos(&stressTetRotation.col0, aosStressTetRotationCol0);
-            FmSetSoaFromAlignedAos(&stressTetRotation.col1, aosStressTetRotationCol1);
-            FmSetSoaFromAlignedAos(&stressTetRotation.col2, aosStressTetRotationCol2);
+            FmSetSoaFromHighwayAos<SoaTypes>(&stressTetRotation.col0, aosStressTetRotationCol0);
+            FmSetSoaFromHighwayAos<SoaTypes>(&stressTetRotation.col1, aosStressTetRotationCol1);
+            FmSetSoaFromHighwayAos<SoaTypes>(&stressTetRotation.col2, aosStressTetRotationCol2);
         }
 
         void Compute()

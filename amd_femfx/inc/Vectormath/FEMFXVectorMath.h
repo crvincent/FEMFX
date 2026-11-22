@@ -32,17 +32,23 @@ THE SOFTWARE.
 #include <math.h>
 #include <float.h>
 #include "simd_utils.h"
+#if defined(FEMFX_SIMD_RUNTIME)
+#define FEMFX_SIMD_SCALAR 1
+#endif
 
 // API derived from Sony Vectormath released with Bullet.
 // Adds public element access and mul() instead of operator* for more similarity with HLSL.
 // SSE version includes unions for element access.
 #define _VECTORMATH_DEBUG
 #include "vectormath_aos.h"        // scalar math implementation
-#if !defined(FEMFX_SIMD_SCALAR)
+#if !defined(FEMFX_SIMD_SCALAR) && !defined(FEMFX_SIMD_RUNTIME)
 #include "simd_vectormath_aos.h"   // SIMD implementation of AoS vectors
 #endif
 #include "soa_vectormath.h"        // SoA vector and matrix types; can template by SoA fundamental type
-#if defined(FEMFX_SIMD_SCALAR)
+#if defined(FEMFX_SIMD_RUNTIME)
+#include "soa_highway.h"
+#undef FEMFX_SIMD_SCALAR
+#elif defined(FEMFX_SIMD_SCALAR)
 #include "soa_scalar.h"             // portable scalar SoA fundamental types
 #else
 #include "soa_float.h"             // SoA fundamental types
@@ -63,6 +69,12 @@ THE SOFTWARE.
 
 namespace AMD
 {
+    void FmHighwayTransposeAosToSoa(
+        size_t components,
+        const float* aos,
+        float* soa,
+        size_t count);
+
 // Sets default vector math types to the scalar implementation, which currently performs better.
 // However SIMD vector types are still used explicitly in parts of the code.
 #define FM_USE_SCALAR_VECTORMATH 1
@@ -76,7 +88,7 @@ namespace AMD
     typedef FmVectormath::Matrix4        FmMatrix4;
     typedef FmVectormath::Transform3     FmTransform3;
 #else
-#if defined(FEMFX_SIMD_SCALAR)
+#if defined(FEMFX_SIMD_SCALAR) || defined(FEMFX_SIMD_RUNTIME)
     typedef FmVectormath::Vector3        FmVector3;
     typedef FmVectormath::Vector4        FmVector4;
     typedef FmVectormath::Point3         FmPoint3;
@@ -95,7 +107,7 @@ namespace AMD
 #endif
 #endif
 
-#if defined(FEMFX_SIMD_SCALAR)
+#if defined(FEMFX_SIMD_SCALAR) || defined(FEMFX_SIMD_RUNTIME)
     typedef FmVectormath::Vector3        FmSimdVector3;
     typedef FmVectormath::Vector4        FmSimdVector4;
     typedef FmVectormath::Point3         FmSimdPoint3;
@@ -116,7 +128,7 @@ namespace AMD
     typedef FmVectormath::Soa4Int        FmSoa4Int;
     typedef FmVectormath::Soa4Uint       FmSoa4Uint;
     typedef FmVectormath::Soa4Bool       FmSoa4Bool;
-#if SIMD_UTILS_USE_AVX
+#if SIMD_UTILS_USE_AVX || defined(FEMFX_SIMD_RUNTIME)
     typedef FmVectormath::Soa8Float      FmSoa8Float;
     typedef FmVectormath::Soa8Int        FmSoa8Int;
     typedef FmVectormath::Soa8Uint       FmSoa8Uint;
@@ -149,7 +161,7 @@ namespace AMD
         static const int                     width = 4;
     };
 
-#if SIMD_UTILS_USE_AVX
+#if SIMD_UTILS_USE_AVX || defined(FEMFX_SIMD_RUNTIME)
     struct FmSoa8Types
     {
         typedef FmSoa8Float                  SoaFloat;
@@ -167,7 +179,9 @@ namespace AMD
     };
 #endif
 
-#if defined(FEMFX_SIMD_SCALAR) || !SIMD_UTILS_USE_AVX
+#if defined(FEMFX_SIMD_RUNTIME)
+    typedef FmSoa8Types FmSoaTypes;
+#elif defined(FEMFX_SIMD_SCALAR) || !SIMD_UTILS_USE_AVX
     typedef FmSoa4Types FmSoaTypes;
 #else
     typedef FmSoa8Types FmSoaTypes;
@@ -266,71 +280,37 @@ namespace AMD
 
     static FM_FORCE_INLINE void FmSetSoaFromUnalignedAos(FmSoa4Types::SoaVector3* result, const FmVector3* aosVecs)
     {
-        Simd128Union v0, v1, v2;
-
-        v0.f[0] = aosVecs[0].x;
-        v0.f[1] = aosVecs[1].x;
-        v0.f[2] = aosVecs[2].x;
-        v0.f[3] = aosVecs[3].x;
-
-        v1.f[0] = aosVecs[0].y;
-        v1.f[1] = aosVecs[1].y;
-        v1.f[2] = aosVecs[2].y;
-        v1.f[3] = aosVecs[3].y;
-
-        v2.f[0] = aosVecs[0].z;
-        v2.f[1] = aosVecs[1].z;
-        v2.f[2] = aosVecs[2].z;
-        v2.f[3] = aosVecs[3].z;
-
-        result->x = FmSoa4Float(v0.vf);
-        result->y = FmSoa4Float(v1.vf);
-        result->z = FmSoa4Float(v2.vf);
+        float soa[3 * 8];
+        FmHighwayTransposeAosToSoa(3, &aosVecs[0].x, soa, 4);
+        *result = FmSoa4Types::SoaVector3(
+            FmSoa4Float(soa), FmSoa4Float(soa + 8), FmSoa4Float(soa + 16));
     }
 
     static FM_FORCE_INLINE void FmSetSoaFromUnalignedAos(FmSoa4Types::SoaVector4* result, const FmVector4* aosVecs)
     {
-        Simd128Union v0, v1, v2, v3;
-
-        v0.f[0] = aosVecs[0].x;
-        v0.f[1] = aosVecs[1].x;
-        v0.f[2] = aosVecs[2].x;
-        v0.f[3] = aosVecs[3].x;
-
-        v1.f[0] = aosVecs[0].y;
-        v1.f[1] = aosVecs[1].y;
-        v1.f[2] = aosVecs[2].y;
-        v1.f[3] = aosVecs[3].y;
-
-        v2.f[0] = aosVecs[0].z;
-        v2.f[1] = aosVecs[1].z;
-        v2.f[2] = aosVecs[2].z;
-        v2.f[3] = aosVecs[3].z;
-
-        v3.f[0] = aosVecs[0].w;
-        v3.f[1] = aosVecs[1].w;
-        v3.f[2] = aosVecs[2].w;
-        v3.f[3] = aosVecs[3].w;
-
-        result->x = FmSoa4Float(v0.vf);
-        result->y = FmSoa4Float(v1.vf);
-        result->z = FmSoa4Float(v2.vf);
-        result->w = FmSoa4Float(v3.vf);
+        float soa[4 * 8];
+        FmHighwayTransposeAosToSoa(4, &aosVecs[0].x, soa, 4);
+        *result = FmSoa4Types::SoaVector4(
+            FmSoa4Float(soa), FmSoa4Float(soa + 8),
+            FmSoa4Float(soa + 16), FmSoa4Float(soa + 24));
     }
 
 #if FM_USE_SCALAR_VECTORMATH
     static FM_FORCE_INLINE void FmSetSoaFromAlignedAos(FmSoa4Types::SoaVector3* result, const FmVector3* aosVecs)
     {
-        FmSimdFloat128 x, y, z;
-        simd_set_soa_vec3(&x, &y, &z, (float*)aosVecs);
-        *result = FmSoa4Types::SoaVector3(FmSoa4Float(x), FmSoa4Float(y), FmSoa4Float(z));
+        float soa[3 * 8];
+        FmHighwayTransposeAosToSoa(3, &aosVecs[0].x, soa, 4);
+        *result = FmSoa4Types::SoaVector3(
+            FmSoa4Float(soa), FmSoa4Float(soa + 8), FmSoa4Float(soa + 16));
     }
 
     static FM_FORCE_INLINE void FmSetSoaFromAlignedAos(FmSoa4Types::SoaVector4* result, const FmVector4* aosVecs)
     {
-        FmSimdFloat128 x, y, z, w;
-        simd_set_soa_vec4(&x, &y, &z, &w, (float*)aosVecs);
-        *result = FmSoa4Types::SoaVector4(FmSoa4Float(x), FmSoa4Float(y), FmSoa4Float(z), FmSoa4Float(w));
+        float soa[4 * 8];
+        FmHighwayTransposeAosToSoa(4, &aosVecs[0].x, soa, 4);
+        *result = FmSoa4Types::SoaVector4(
+            FmSoa4Float(soa), FmSoa4Float(soa + 8),
+            FmSoa4Float(soa + 16), FmSoa4Float(soa + 24));
     }
 #else
     static FM_FORCE_INLINE void FmSetSoaFromAlignedAos(FmSoa4Types::SoaVector3* result, const FmSimdVector3* aosVecs)
@@ -369,63 +349,19 @@ namespace AMD
 #if FM_USE_SCALAR_VECTORMATH
     static FM_FORCE_INLINE void FmSetSoaFromAlignedAos(FmSoa8Types::SoaVector3* result, const FmVector3* aosVecs)
     {
-        __m256 x, y, z;
-        simd_set_soa_vec3(&x, &y, &z, (float*)aosVecs);
-        *result = FmSoa8Types::SoaVector3(FmSoa8Float(x), FmSoa8Float(y), FmSoa8Float(z));
+        float soa[3 * 8];
+        FmHighwayTransposeAosToSoa(3, &aosVecs[0].x, soa, 8);
+        *result = FmSoa8Types::SoaVector3(
+            FmSoa8Float(soa), FmSoa8Float(soa + 8), FmSoa8Float(soa + 16));
     }
 
     static FM_FORCE_INLINE void FmSetSoaFromAlignedAos(FmSoa8Types::SoaVector4* result, const FmVector4* aosVecs)
     {
-        __m256 x, y, z, w;
-        simd_set_soa_vec4(&x, &y, &z, &w, (float*)aosVecs);
-        *result = FmSoa8Types::SoaVector4(FmSoa8Float(x), FmSoa8Float(y), FmSoa8Float(z), FmSoa8Float(w));
-    }
-#else
-    static FM_FORCE_INLINE void FmSetSoaFromAlignedAos(FmSoa8Types::SoaVector3* result, const FmSimdVector3* aosVecs)
-    {
-        FmSimdMatrix4 mat0;
-        mat0.col0 = FmSimdVector4(aosVecs[0].get128());
-        mat0.col1 = FmSimdVector4(aosVecs[1].get128());
-        mat0.col2 = FmSimdVector4(aosVecs[2].get128());
-        mat0.col3 = FmSimdVector4(aosVecs[3].get128());
-
-        mat0 = transpose(mat0);
-
-        FmSimdMatrix4 mat1;
-        mat1.col0 = FmSimdVector4(aosVecs[4].get128());
-        mat1.col1 = FmSimdVector4(aosVecs[5].get128());
-        mat1.col2 = FmSimdVector4(aosVecs[6].get128());
-        mat1.col3 = FmSimdVector4(aosVecs[7].get128());
-
-        mat1 = transpose(mat1);
-
-        result->x = FmSoa8Float(_mm256_setr_m128(mat0.col0.get128(), mat1.col0.get128()));
-        result->y = FmSoa8Float(_mm256_setr_m128(mat0.col1.get128(), mat1.col1.get128()));
-        result->z = FmSoa8Float(_mm256_setr_m128(mat0.col2.get128(), mat1.col2.get128()));
-    }
-
-    static FM_FORCE_INLINE void FmSetSoaFromAlignedAos(FmSoa8Types::SoaVector4* result, const FmSimdVector4* aosVecs)
-    {
-        FmSimdMatrix4 mat0;
-        mat0.col0 = aosVecs[0];
-        mat0.col1 = aosVecs[1];
-        mat0.col2 = aosVecs[2];
-        mat0.col3 = aosVecs[3];
-
-        mat0 = transpose(mat0);
-
-        FmSimdMatrix4 mat1;
-        mat1.col0 = aosVecs[4];
-        mat1.col1 = aosVecs[5];
-        mat1.col2 = aosVecs[6];
-        mat1.col3 = aosVecs[7];
-
-        mat1 = transpose(mat1);
-
-        result->x = FmSoa8Float(_mm256_setr_m128(mat0.col0.get128(), mat1.col0.get128()));
-        result->y = FmSoa8Float(_mm256_setr_m128(mat0.col1.get128(), mat1.col1.get128()));
-        result->z = FmSoa8Float(_mm256_setr_m128(mat0.col2.get128(), mat1.col2.get128()));
-        result->w = FmSoa8Float(_mm256_setr_m128(mat0.col3.get128(), mat1.col3.get128()));
+        float soa[4 * 8];
+        FmHighwayTransposeAosToSoa(4, &aosVecs[0].x, soa, 8);
+        *result = FmSoa8Types::SoaVector4(
+            FmSoa8Float(soa), FmSoa8Float(soa + 8),
+            FmSoa8Float(soa + 16), FmSoa8Float(soa + 24));
     }
 #endif
 #endif
@@ -597,7 +533,7 @@ namespace AMD
         return result;
     }
 
-#if FM_USE_SCALAR_VECTORMATH && !defined(FEMFX_SIMD_SCALAR)
+#if FM_USE_SCALAR_VECTORMATH && !defined(FEMFX_SIMD_SCALAR) && !defined(FEMFX_SIMD_RUNTIME)
     static FM_FORCE_INLINE FmSimdVector3 FmNormalize(float* lenSqr, const FmSimdVector3& a)
     {
         float lSqr = dot(a, a);
@@ -665,35 +601,6 @@ namespace AMD
     }
 #endif
 
-#if !defined(FEMFX_SIMD_SCALAR)
-    static FM_FORCE_INLINE FmSimdVector3 FmInitSimdVector3(const FmVector3& vec)
-    {
-        __m128 m = simd_load3_unaligned_ps(&vec.x);
-        return FmSimdVector3(m);
-        //return FmSimdVector3(vec.x, vec.y, vec.z);
-    }
-
-    static FM_FORCE_INLINE FmSimdMatrix3 FmInitSimdMatrix3(const FmMatrix3& mat)
-    {
-        return FmSimdMatrix3(
-            FmInitSimdVector3(mat.col0),
-            FmInitSimdVector3(mat.col1),
-            FmInitSimdVector3(mat.col2));
-    }
-
-    static FM_FORCE_INLINE FmVector3 FmInitVector3(const FmSimdVector3& vec)
-    {
-        FmVector3 result;
-        simd_store3_unaligned_ps(&result.x, vec.mVec128);
-        return result;
-        //return FmInitVector3(vec.x, vec.y, vec.z);
-    }
-
-    static FM_FORCE_INLINE FmMatrix3 FmInitMatrix3(const FmSimdMatrix3& mat)
-    {
-        return FmMatrix3(FmInitVector3(mat.getCol0()), FmInitVector3(mat.getCol1()), FmInitVector3(mat.getCol2()));
-    }
-#else
     static FM_FORCE_INLINE FmSimdVector3 FmInitSimdVector3(const FmVector3& vec)
     {
         return FmSimdVector3(vec.x, vec.y, vec.z);
@@ -713,7 +620,6 @@ namespace AMD
     {
         return FmMatrix3(mat.col0, mat.col1, mat.col2);
     }
-#endif
 
     template<class SoaTypes>
     static FM_FORCE_INLINE const typename SoaTypes::SoaVector3 FmInitVector3(typename SoaTypes::SoaFloat x, typename SoaTypes::SoaFloat y, typename SoaTypes::SoaFloat z)
