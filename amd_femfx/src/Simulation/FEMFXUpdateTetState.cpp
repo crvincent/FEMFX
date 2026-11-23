@@ -30,8 +30,6 @@ THE SOFTWARE.
 #include "FEMFXScene.h"
 #include "FEMFXUpdateTetState.h"
 
-#define FM_UPDATE_TET_BATCH_SIZE 64
-
 namespace AMD
 {
     // Input data required for updating tet state: tet rotation, stiffness, plasticity, and testing fracture
@@ -1353,7 +1351,7 @@ namespace AMD
         FmTetMesh* tetMesh;
         FmVector3 centerOfMass;
         uint numTets;
-        uint numTetTasks;
+        uint tetBatchSize;
 
         bool runFracture;
         bool updatePlasticity;
@@ -1362,7 +1360,7 @@ namespace AMD
 
         FmTaskDataUpdateTetState(
             FmScene* inScene, FmTetMesh* inTetMesh, const FmVector3& inCenterOfMass,
-            uint inNumTets, uint inNumTetTasks,
+            uint inNumTets, uint inTetBatchSize,
             bool inRunFracture, bool inUpdatePlasticity, bool inMeshSupportsPlasticity, bool inComputingDeformation)
         {
             FmAtomicWrite(&removedKinematicFlag.val, 0);
@@ -1371,7 +1369,7 @@ namespace AMD
             tetMesh = inTetMesh;
             centerOfMass = inCenterOfMass;
             numTets = inNumTets;
-            numTetTasks = inNumTetTasks;
+            tetBatchSize = inTetBatchSize;
             runFracture = inRunFracture;
             updatePlasticity = inUpdatePlasticity;
             meshSupportsPlasticity = inMeshSupportsPlasticity;
@@ -1394,7 +1392,7 @@ namespace AMD
         bool computingStrainMag = taskData->computingStrainMag;
 
         uint beginIdx, endIdx;
-        FmGetIndexRange(&beginIdx, &endIdx, (uint)inTaskBeginIndex, FM_UPDATE_TET_BATCH_SIZE, taskData->numTets);
+        FmGetIndexRange(&beginIdx, &endIdx, (uint)inTaskBeginIndex, taskData->tetBatchSize, taskData->numTets);
 
         bool removedKinematicFlag;
         uint maxUnconstrainedSolveIterations;
@@ -1471,16 +1469,17 @@ namespace AMD
 
         bool computingStrainMag = FM_IS_SET(tetMesh->flags, FM_OBJECT_FLAG_COMPUTE_TET_STRAIN_MAG);
         
-        uint numUpdateTetTasks = FmGetNumTasks(tetMesh->numTets, FM_UPDATE_TET_BATCH_SIZE); 
+        uint updateTetBatchSize = scene ? FmMaxUint(scene->params.updateTetBatchSize, 1u) : 128;
+        uint numUpdateTetTasks = FmGetNumTasks(numTets, updateTetBatchSize);
 
 #if FM_ASYNC_THREADING
         if (parentTaskData)
         {
-            if (numTets > 128)
+            if (numUpdateTetTasks > 1)
             {
                 // If enough tets, parallelize using a parallel for
                 FmTaskDataUpdateTetState* taskData = new FmTaskDataUpdateTetState(
-                    scene, tetMesh, centerOfMass, numTets, numUpdateTetTasks, runFracture, updatePlasticity, meshSupportsPlasticity, computingStrainMag);
+                    scene, tetMesh, centerOfMass, numTets, updateTetBatchSize, runFracture, updatePlasticity, meshSupportsPlasticity, computingStrainMag);
 
                 taskData->progress.Init(numUpdateTetTasks, FmTaskFuncFinishUpdateTetsAndFracture, taskData);
                 taskData->parentTaskData = parentTaskData;

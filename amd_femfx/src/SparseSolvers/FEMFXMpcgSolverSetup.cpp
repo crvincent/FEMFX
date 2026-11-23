@@ -279,6 +279,7 @@ namespace AMD
         const FmSVector3& centerOfMass,
         FmTetVertIds tetVertIds,
         float dt2rayleigh,
+        float rayleighStiffnessCoeff,
         float deltat)
     {
         uint vId0 = tetVertIds.ids[0];
@@ -299,6 +300,12 @@ namespace AMD
         xtemp[2] = FmInitSVector3(tetMesh->vertsPos[vId2]) - centerOfMass;
         xtemp[3] = FmInitSVector3(tetMesh->vertsPos[vId3]) - centerOfMass;
 #endif
+
+        // Adapted from https://github.com/ericjlarsen/FEMFX
+        xtemp[0] += FmInitSVector3(tetMesh->vertsVel[vId0]) * rayleighStiffnessCoeff;
+        xtemp[1] += FmInitSVector3(tetMesh->vertsVel[vId1]) * rayleighStiffnessCoeff;
+        xtemp[2] += FmInitSVector3(tetMesh->vertsVel[vId2]) * rayleighStiffnessCoeff;
+        xtemp[3] += FmInitSVector3(tetMesh->vertsVel[vId3]) * rayleighStiffnessCoeff;
 
         bool isKinematic0 = tetMesh->vertsFlags[vId0] & FM_VERT_FLAG_KINEMATIC;
         bool isKinematic1 = tetMesh->vertsFlags[vId1] & FM_VERT_FLAG_KINEMATIC;
@@ -505,7 +512,7 @@ namespace AMD
             }
 
 #if FM_SOLVE_DELTAV
-            data->b[svId] = FmInitSVector3(extForce + gravityVector * mass - vel * (mass * rayleighMassCoeff + rayleighStiffnessCoeff)) * deltat;
+            data->b[svId] = FmInitSVector3(extForce + gravityVector * mass - vel * mass * rayleighMassCoeff) * deltat;
 #else
             data->b[svId] = FmInitSVector3(vel * mass + (extForce + gravityVector * mass) * deltat);
 #endif
@@ -575,6 +582,7 @@ namespace AMD
                         centerOfMass,
                         tetMesh->tetsVertIds[tetId],
                         dt2rayleigh,
+                        rayleighStiffnessCoeff,
                         deltat);
                 }
 
@@ -616,6 +624,7 @@ namespace AMD
                 centerOfMass,
                 tetVertIds,
                 dt2rayleigh,
+                rayleighStiffnessCoeff,
                 deltat);
 #endif
         }
@@ -643,6 +652,7 @@ namespace AMD
                     centerOfMass,
                     tetMesh->tetsVertIds[tetId],
                     dt2rayleigh,
+                    rayleighStiffnessCoeff,
                     deltat);
             }
         }
@@ -718,7 +728,7 @@ namespace AMD
             data->A.indices[vId] = vId;
 
 #if FM_SOLVE_DELTAV
-            data->b[vId] = FmInitSVector3(extForce + gravityVector * mass - vel * (mass * rayleighMassCoeff + rayleighStiffnessCoeff)) * deltat;
+            data->b[vId] = FmInitSVector3(extForce + gravityVector * mass - vel * mass * rayleighMassCoeff) * deltat;
 #else
             data->b[vId] = FmInitSVector3(vel * mass + (extForce + gravityVector * mass) * deltat);
 #endif
@@ -768,6 +778,12 @@ namespace AMD
                 xtemp[2] = FmInitSVector3(tetMesh->vertsPos[vId2]) - centerOfMass;
                 xtemp[3] = FmInitSVector3(tetMesh->vertsPos[vId3]) - centerOfMass;
 #endif
+
+                // Adapted from https://github.com/ericjlarsen/FEMFX
+                xtemp[0] += FmInitSVector3(tetMesh->vertsVel[vId0]) * rayleighStiffnessCoeff;
+                xtemp[1] += FmInitSVector3(tetMesh->vertsVel[vId1]) * rayleighStiffnessCoeff;
+                xtemp[2] += FmInitSVector3(tetMesh->vertsVel[vId2]) * rayleighStiffnessCoeff;
+                xtemp[3] += FmInitSVector3(tetMesh->vertsVel[vId3]) * rayleighStiffnessCoeff;
 
                 FmMatrix3 Ke0, Ke1, Ke2, Ke3;
                 FmVector3 f0eprime;

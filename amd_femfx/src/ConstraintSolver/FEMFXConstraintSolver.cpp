@@ -347,7 +347,6 @@ namespace AMD
         const FmConstraintJacobian& FM_RESTRICT J,
         const FmSVector3* FM_RESTRICT pgsRhs,
         const FmSMatrix3* FM_RESTRICT DAinv,
-        const FmSVector3* FM_RESTRICT totalLambda3,
         float omega,
         uint passIdx,
         uint rowIdx)
@@ -361,9 +360,6 @@ namespace AMD
 
         FmSVector3 rowResult = pgsRhs[rowIdx];
         FmSVector3 lambda3Orig = lambda3[rowIdx];
-
-        // Get current total lambda from previous outer iterations, and add with current lambda before projection
-        FmSVector3 totLambda3 = (totalLambda3 == NULL) ? FmInitSVector3(0.0f) : totalLambda3[rowIdx];
 
         FmSMatrix3* jacobianSubmats = (FmSMatrix3*)((uint8_t*)J.submats + constraintParams.jacobianSubmatsOffset);
         uint* jacobianIndices = (uint*)((uint8_t*)J.indices + constraintParams.jacobianIndicesOffset);
@@ -385,8 +381,6 @@ namespace AMD
 
         // Under-relaxation for stability benefit
         rowResult = (1.0f - omega) * lambda3Orig + omega * rowResult;
-
-        rowResult += totLambda3;
 
         float lambda = rowResult.x;
         float gamma1 = rowResult.y;
@@ -438,7 +432,8 @@ namespace AMD
             }
         }
 
-        FmSVector3 lambda3Update = FmInitSVector3(lambda, gamma1, gamma2) - totLambda3;
+        // Adapted from https://github.com/ericjlarsen/FEMFX
+        FmSVector3 lambda3Update = FmInitSVector3(lambda, gamma1, gamma2);
 
         // Update J^T * lambda given change in lambda values
         FmSVector3 deltaLambda = lambda3Update - lambda3Orig;
@@ -472,7 +467,7 @@ namespace AMD
 
     // Execute one iteration of Projected Gauss-Seidel.
     // Return error norm used in convergence test: inf norm of solution change.
-    static inline void FmPgsIteration3(FmSolverIterationNorms* resultNorms, FmConstraintSolverData* constraintSolverData, uint passIdx, uint outerIteration)
+    static inline void FmPgsIteration3(FmSolverIterationNorms* resultNorms, FmConstraintSolverData* constraintSolverData, uint passIdx)
     {
         FmSVector3* lambda3 = constraintSolverData->lambda3;
         FmSVector3* JTlambda = constraintSolverData->JTlambda;
@@ -480,7 +475,6 @@ namespace AMD
         const FmSVector3* pgsRhs = constraintSolverData->pgsRhs;
         const FmConstraintSolverControlParams& controlParams = *constraintSolverData->currentControlParams;
         const FmSMatrix3* DAinv = constraintSolverData->GetBlockDiagInv(passIdx);
-        const FmSVector3* totalLambda = (passIdx == 0 && outerIteration > 0) ? constraintSolverData->lambda3Temp : NULL; // not initialized until first iteration
         float omega = controlParams.passParams[passIdx].kPgsRelaxationOmega;
 
         uint numRows = constraintSolverData->numConstraints;
@@ -490,13 +484,13 @@ namespace AMD
 
         for (uint rowIdx = 0; rowIdx < numRows; rowIdx++)
         {
-            FmPgsIteration3Row(&norms, lambda3, JTlambda, J, pgsRhs, DAinv, totalLambda, omega, passIdx, rowIdx);
+            FmPgsIteration3Row(&norms, lambda3, JTlambda, J, pgsRhs, DAinv, omega, passIdx, rowIdx);
         }
 
         *resultNorms = norms;
     }
 
-    static inline void FmPgsIteration3(FmSolverIterationNorms* resultNorms, FmConstraintSolverData* constraintSolverData, uint* indices, uint numRows, uint passIdx, uint outerIteration)
+    static inline void FmPgsIteration3(FmSolverIterationNorms* resultNorms, FmConstraintSolverData* constraintSolverData, uint* indices, uint numRows, uint passIdx)
     {
         FmSVector3* lambda3 = constraintSolverData->lambda3;
         FmSVector3* JTlambda = constraintSolverData->JTlambda;
@@ -504,7 +498,6 @@ namespace AMD
         const FmSVector3* pgsRhs = constraintSolverData->pgsRhs;
         const FmConstraintSolverControlParams& controlParams = *constraintSolverData->currentControlParams;
         const FmSMatrix3* DAinv = constraintSolverData->GetBlockDiagInv(passIdx);
-        const FmSVector3* totalLambda = (passIdx == 0 && outerIteration > 0) ? constraintSolverData->lambda3Temp : NULL; // not initialized until first iteration
         float omega = controlParams.passParams[passIdx].kPgsRelaxationOmega;
 
         FmSolverIterationNorms norms;
@@ -514,13 +507,13 @@ namespace AMD
         {
             uint rowIdx = indices[indexId];
 
-            FmPgsIteration3Row(&norms, lambda3, JTlambda, J, pgsRhs, DAinv, totalLambda, omega, passIdx, rowIdx);
+            FmPgsIteration3Row(&norms, lambda3, JTlambda, J, pgsRhs, DAinv, omega, passIdx, rowIdx);
         }
 
         *resultNorms = norms;
     }
 
-    static inline void FmPgsIteration3Reverse(FmSolverIterationNorms* resultNorms, FmConstraintSolverData* constraintSolverData, uint passIdx, uint outerIteration)
+    static inline void FmPgsIteration3Reverse(FmSolverIterationNorms* resultNorms, FmConstraintSolverData* constraintSolverData, uint passIdx)
     {
         FmSVector3* lambda3 = constraintSolverData->lambda3;
         FmSVector3* JTlambda = constraintSolverData->JTlambda;
@@ -528,7 +521,6 @@ namespace AMD
         const FmSVector3* pgsRhs = constraintSolverData->pgsRhs;
         const FmConstraintSolverControlParams& controlParams = *constraintSolverData->currentControlParams;
         const FmSMatrix3* DAinv = constraintSolverData->GetBlockDiagInv(passIdx);
-        const FmSVector3* totalLambda = (passIdx == FM_CG_PASS_IDX && outerIteration > 0) ? constraintSolverData->lambda3Temp : NULL; // not initialized until first iteration
         float omega = controlParams.passParams[passIdx].kPgsRelaxationOmega;
 
         uint numRows = constraintSolverData->numConstraints;
@@ -538,13 +530,13 @@ namespace AMD
 
         for (int rowIdx = (int)numRows - 1; rowIdx >= 0; rowIdx--)
         {
-            FmPgsIteration3Row(&norms, lambda3, JTlambda, J, pgsRhs, DAinv, totalLambda, omega, passIdx, rowIdx);
+            FmPgsIteration3Row(&norms, lambda3, JTlambda, J, pgsRhs, DAinv, omega, passIdx, rowIdx);
         }
 
         *resultNorms = norms;
     }
 
-    static inline void FmPgsIteration3Reverse(FmSolverIterationNorms* resultNorms, FmConstraintSolverData* constraintSolverData, uint* indices, uint numRows, uint passIdx, uint outerIteration)
+    static inline void FmPgsIteration3Reverse(FmSolverIterationNorms* resultNorms, FmConstraintSolverData* constraintSolverData, uint* indices, uint numRows, uint passIdx)
     {
         FmSVector3* lambda3 = constraintSolverData->lambda3;
         FmSVector3* JTlambda = constraintSolverData->JTlambda;
@@ -552,7 +544,6 @@ namespace AMD
         const FmSVector3* pgsRhs = constraintSolverData->pgsRhs;
         const FmConstraintSolverControlParams& controlParams = *constraintSolverData->currentControlParams;
         const FmSMatrix3* DAinv = constraintSolverData->GetBlockDiagInv(passIdx);
-        const FmSVector3* totalLambda = (passIdx == FM_CG_PASS_IDX && outerIteration > 0) ? constraintSolverData->lambda3Temp : NULL;
         float omega = controlParams.passParams[passIdx].kPgsRelaxationOmega;
 
         FmSolverIterationNorms norms;
@@ -562,7 +553,7 @@ namespace AMD
         {
             uint rowIdx = indices[indexId];
 
-            FmPgsIteration3Row(&norms, lambda3, JTlambda, J, pgsRhs, DAinv, totalLambda, omega, passIdx, rowIdx);
+            FmPgsIteration3Row(&norms, lambda3, JTlambda, J, pgsRhs, DAinv, omega, passIdx, rowIdx);
         }
 
         *resultNorms = norms;
@@ -1259,18 +1250,17 @@ namespace AMD
 
         if (forwardDirection)
         {
-            FmPgsIteration3(&partitionPair.norms, constraintSolverData, partitionPair.constraintIndices, partitionPair.numConstraints, passIdx, nodeData.outerIteration);
+            FmPgsIteration3(&partitionPair.norms, constraintSolverData, partitionPair.constraintIndices, partitionPair.numConstraints, passIdx);
         }
         else
         {
-            FmPgsIteration3Reverse(&partitionPair.norms, constraintSolverData, partitionPair.constraintIndices, partitionPair.numConstraints, passIdx, nodeData.outerIteration);
+            FmPgsIteration3Reverse(&partitionPair.norms, constraintSolverData, partitionPair.constraintIndices, partitionPair.numConstraints, passIdx);
         }
 
         FmTaskGraphNode* nextNode = NULL;
         if (completedInnerIterations)
         {
             // Increase or reset outer iteration
-            bool isFirstOuterIteration = outerIteration == 0;
             bool isLastOuterIteration = outerIteration + 1 >= maxOuterIterations;
 
             if (isLastOuterIteration)
@@ -1289,28 +1279,6 @@ namespace AMD
 
             if (passIdx == FM_CG_PASS_IDX)
             {
-                // End of inner iterations, reset lambda for next outer iteration
-                for (uint constraintIdx = 0; constraintIdx < partitionPair.numConstraints; constraintIdx++)
-                {
-                    uint rowIdx = partitionPair.constraintIndices[constraintIdx];
-
-                    FmSVector3 lambda3Sum = isFirstOuterIteration ? FmInitSVector3(0.0f) : constraintSolverData->lambda3Temp[rowIdx];
-
-                    lambda3Sum += constraintSolverData->lambda3[rowIdx];
-
-                    if (isLastOuterIteration)
-                    {
-                        // Set lambda to the accumulated sum over all outer iterations
-                        constraintSolverData->lambda3[rowIdx] = lambda3Sum;
-                    }
-                    else
-                    {
-                        // Store lambda sum and reset lambda to zero
-                        constraintSolverData->lambda3Temp[rowIdx] = lambda3Sum;
-                        constraintSolverData->lambda3[rowIdx] = FmInitSVector3(0.0f);
-                    }
-                }
-
                 // Enable dependent MPCG solves
                 FmPartitionMpcgTaskMessages(taskGraph, pairIdx, outerIteration, &nextNode);
             }
@@ -1946,11 +1914,11 @@ namespace AMD
 
             if (forwardDirection)
             {
-                FmPgsIteration3(&partitionPair.norms, constraintSolverData, partitionPair.constraintIndices, partitionPair.numConstraints, passIdx, outerIteration);
+                FmPgsIteration3(&partitionPair.norms, constraintSolverData, partitionPair.constraintIndices, partitionPair.numConstraints, passIdx);
             }
             else
             {
-                FmPgsIteration3Reverse(&partitionPair.norms, constraintSolverData, partitionPair.constraintIndices, partitionPair.numConstraints, passIdx, outerIteration);
+                FmPgsIteration3Reverse(&partitionPair.norms, constraintSolverData, partitionPair.constraintIndices, partitionPair.numConstraints, passIdx);
             }
         }
     }
@@ -2002,39 +1970,6 @@ namespace AMD
             FmExternalPgsIteration(externalPgsData);
         }
 
-        bool isFirstOuterIteration = iterationParams.outerIteration == 0;
-        bool isLastOuterIteration = iterationParams.outerIsLastIteration;
-
-        // End of inner iterations, reset lambda for next outer iteration
-        if (passIdx == FM_CG_PASS_IDX)
-        {
-            uint numPartitionPairs = constraintSolverData->numPartitionPairs;
-
-            for (uint pairIdx = 0; pairIdx < numPartitionPairs; pairIdx++)
-            {
-                FmPartitionPair& partitionPair = constraintSolverData->partitionPairs[pairIdx];
-                for (uint constraintIdx = 0; constraintIdx < partitionPair.numConstraints; constraintIdx++)
-                {
-                    uint rowIdx = partitionPair.constraintIndices[constraintIdx];
-
-                    FmSVector3 lambda3Sum = isFirstOuterIteration ? FmInitSVector3(0.0f) : constraintSolverData->lambda3Temp[rowIdx];
-
-                    lambda3Sum += constraintSolverData->lambda3[rowIdx];
-
-                    if (isLastOuterIteration)
-                    {
-                        // Set lambda to the accumulated sum over all outer iterations
-                        constraintSolverData->lambda3[rowIdx] = lambda3Sum;
-                    }
-                    else
-                    {
-                        // Store lambda sum and reset lambda to zero
-                        constraintSolverData->lambda3Temp[rowIdx] = lambda3Sum;
-                        constraintSolverData->lambda3[rowIdx] = FmInitSVector3(0.0f);
-                    }
-                }
-            }
-        }
     }
 #endif
 
@@ -2449,11 +2384,6 @@ namespace AMD
 
         if (maxOuterIterationsCgPass > 0)
         {
-            for (uint i = 0; i < numIslandConstraints; i++)
-            {
-                constraintSolverData->lambda3Temp[i] = FmInitSVector3(0.0f);
-            }
-
             for (uint outerIteration = 0; outerIteration < maxOuterIterationsCgPass; outerIteration++)
             {
                 bool isLastIteration = (outerIteration >= maxOuterIterationsCgPass - 1);
@@ -2478,21 +2408,10 @@ namespace AMD
                 scene->taskSystemCallbacks.ParallelFor("RunMpcg", FmTaskFuncIslandRunMpcgOrRbResponse, &taskDataRunMpcg, numTasksToRun);
 #endif
 
-                for (uint i = 0; i < numIslandConstraints; i++)
-                {
-                    constraintSolverData->lambda3Temp[i] += constraintSolverData->lambda3[i];
-                    constraintSolverData->lambda3[i] = FmInitSVector3(0.0f);
-                }
-
                 if (passParamsCopy.useInnerIterationsFalloff && passParamsCopy.maxInnerIterations > 1)
                 {
                     passParamsCopy.maxInnerIterations--;
                 }
-            }
-
-            for (uint i = 0; i < numIslandConstraints; i++)
-            {
-                constraintSolverData->lambda3[i] = constraintSolverData->lambda3Temp[i];
             }
 
             FmDiagxNegOffDiagMxV(constraintSolverData->pgsDeltaVelTerm, scene, constraintIsland, constraintSolverData->GetDeltaVec());
