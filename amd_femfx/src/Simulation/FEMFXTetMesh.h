@@ -37,6 +37,9 @@ THE SOFTWARE.
 #include "FEMFXGraphColoring.h"
 #include "FEMFXVelStats.h"
 
+#define FM_DEFAULT_MIN_SHAPE_SINGULAR_VALUE_RATIO 0.02f
+#define FM_DEFAULT_MIN_SHAPE_SINGULAR_VALUE 1e-4f
+
 namespace AMD
 {
     struct FmScene;
@@ -218,6 +221,8 @@ namespace AMD
         uint                             sleepStableCount;                    // Number of steps that speeds must fall under thresholds to initiate sleeping
         float                            extForceSpeedLimit;                  // For stability project external force to not increase vertex speed above limit
         float                            resetSpeedLimit;                     // Speed above this will trigger a reset
+        float                            minShapeSingularValueRatio;           // Minimum ratio of smallest to largest rest-shape singular value
+        float                            minShapeSingularValue;                // Absolute minimum rest-shape singular value
                                          
         FmVelStats                       velStats;                            // Statistics for sleeping test
                                          
@@ -384,6 +389,8 @@ namespace AMD
         mesh->sleepStableCount = 20;
         mesh->extForceSpeedLimit = 100.0f;
         mesh->resetSpeedLimit = 200.0f;
+        mesh->minShapeSingularValueRatio = FM_DEFAULT_MIN_SHAPE_SINGULAR_VALUE_RATIO;
+        mesh->minShapeSingularValue = FM_DEFAULT_MIN_SHAPE_SINGULAR_VALUE;
         FmInitVelStats(&mesh->velStats);
         mesh->flags = (FM_OBJECT_FLAG_NEEDS_CONNECTED_COMPONENTS | FM_OBJECT_FLAG_NEEDS_ADJACENT_VERT_OFFSETS);
         mesh->collisionGroup = 0;

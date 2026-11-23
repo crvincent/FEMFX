@@ -160,6 +160,10 @@ namespace AMD
 
         // Inputs
         FmSoaTetShapeParams<SoaTypes> stressShapeParams;   // Shape params based on plastic deformed rest positions, for computing elastic stress
+        typename SoaTypes::SoaVector3 stressRestPosition0;
+        typename SoaTypes::SoaVector3 stressRestPosition1;
+        typename SoaTypes::SoaVector3 stressRestPosition2;
+        typename SoaTypes::SoaVector3 stressRestPosition3;
         typename SoaTypes::SoaMatrix3 stressTetRotation;
         typename SoaTypes::SoaFloat youngsModulus;
         typename SoaTypes::SoaFloat poissonsRatio;
@@ -172,6 +176,10 @@ namespace AMD
         FM_ALIGN(16) FmVector4 aosStressShapeParamsBaryMatrixCol1[SoaTypes::width] FM_ALIGN_END(16);
         FM_ALIGN(16) FmVector4 aosStressShapeParamsBaryMatrixCol2[SoaTypes::width] FM_ALIGN_END(16);
         FM_ALIGN(16) FmVector4 aosStressShapeParamsBaryMatrixCol3[SoaTypes::width] FM_ALIGN_END(16);
+        FM_ALIGN(16) FmVector3 aosStressRestPosition0[SoaTypes::width] FM_ALIGN_END(16);
+        FM_ALIGN(16) FmVector3 aosStressRestPosition1[SoaTypes::width] FM_ALIGN_END(16);
+        FM_ALIGN(16) FmVector3 aosStressRestPosition2[SoaTypes::width] FM_ALIGN_END(16);
+        FM_ALIGN(16) FmVector3 aosStressRestPosition3[SoaTypes::width] FM_ALIGN_END(16);
         FM_ALIGN(16) FmVector3 aosStressTetRotationCol0[SoaTypes::width] FM_ALIGN_END(16);
         FM_ALIGN(16) FmVector3 aosStressTetRotationCol1[SoaTypes::width] FM_ALIGN_END(16);
         FM_ALIGN(16) FmVector3 aosStressTetRotationCol2[SoaTypes::width] FM_ALIGN_END(16);
@@ -187,6 +195,10 @@ namespace AMD
                 aosStressShapeParamsBaryMatrixCol1[sliceIdx] = FmInitVector4(0.0f);
                 aosStressShapeParamsBaryMatrixCol2[sliceIdx] = FmInitVector4(0.0f);
                 aosStressShapeParamsBaryMatrixCol3[sliceIdx] = FmInitVector4(0.0f);
+                aosStressRestPosition0[sliceIdx] = FmInitVector3(0.0f);
+                aosStressRestPosition1[sliceIdx] = FmInitVector3(0.0f);
+                aosStressRestPosition2[sliceIdx] = FmInitVector3(0.0f);
+                aosStressRestPosition3[sliceIdx] = FmInitVector3(0.0f);
                 aosStressTetRotationCol0[sliceIdx] = FmInitVector3(0.0f);
                 aosStressTetRotationCol1[sliceIdx] = FmInitVector3(0.0f);
                 aosStressTetRotationCol2[sliceIdx] = FmInitVector3(0.0f);
@@ -201,6 +213,10 @@ namespace AMD
         void SetBatchSlice(
             uint idx,
             const FmTetShapeParams& inStressShapeParams,
+            const FmVector3& inStressRestPosition0,
+            const FmVector3& inStressRestPosition1,
+            const FmVector3& inStressRestPosition2,
+            const FmVector3& inStressRestPosition3,
             const FmMatrix3& inStressTetRotation,
             float inYoungsModulus,
             float inPoissonsRatio,
@@ -210,6 +226,10 @@ namespace AMD
             aosStressShapeParamsBaryMatrixCol1[idx] = inStressShapeParams.baryMatrix.col1;
             aosStressShapeParamsBaryMatrixCol2[idx] = inStressShapeParams.baryMatrix.col2;
             aosStressShapeParamsBaryMatrixCol3[idx] = inStressShapeParams.baryMatrix.col3;
+            aosStressRestPosition0[idx] = inStressRestPosition0;
+            aosStressRestPosition1[idx] = inStressRestPosition1;
+            aosStressRestPosition2[idx] = inStressRestPosition2;
+            aosStressRestPosition3[idx] = inStressRestPosition3;
             aosStressTetRotationCol0[idx] = inStressTetRotation.col0;
             aosStressTetRotationCol1[idx] = inStressTetRotation.col1;
             aosStressTetRotationCol2[idx] = inStressTetRotation.col2;
@@ -235,6 +255,10 @@ namespace AMD
             FmSetSoaFromHighwayAos<SoaTypes>(&stressShapeParams.baryMatrix.col1, aosStressShapeParamsBaryMatrixCol1);
             FmSetSoaFromHighwayAos<SoaTypes>(&stressShapeParams.baryMatrix.col2, aosStressShapeParamsBaryMatrixCol2);
             FmSetSoaFromHighwayAos<SoaTypes>(&stressShapeParams.baryMatrix.col3, aosStressShapeParamsBaryMatrixCol3);
+            FmSetSoaFromHighwayAos<SoaTypes>(&stressRestPosition0, aosStressRestPosition0);
+            FmSetSoaFromHighwayAos<SoaTypes>(&stressRestPosition1, aosStressRestPosition1);
+            FmSetSoaFromHighwayAos<SoaTypes>(&stressRestPosition2, aosStressRestPosition2);
+            FmSetSoaFromHighwayAos<SoaTypes>(&stressRestPosition3, aosStressRestPosition3);
 
             FmSetSoaFromHighwayAos<SoaTypes>(&stressTetRotation.col0, aosStressTetRotationCol0);
             FmSetSoaFromHighwayAos<SoaTypes>(&stressTetRotation.col1, aosStressTetRotationCol1);
@@ -251,15 +275,6 @@ namespace AMD
                 stressShapeParams.baryMatrix.col2,
                 stressShapeParams.GetVolume(),
                 youngsModulus, poissonsRatio);
-
-            typename SoaTypes::SoaVector3 stressRestPosition0;
-            typename SoaTypes::SoaVector3 stressRestPosition1;
-            typename SoaTypes::SoaVector3 stressRestPosition2;
-            typename SoaTypes::SoaVector3 stressRestPosition3;
-
-            // Recompute rest positions from the shape params so they reflect plastic deformation.
-            // Safe to recompute for non-plastic meshes also.
-            stressShapeParams.ComputeRestPositions(&stressRestPosition0, &stressRestPosition1, &stressRestPosition2, &stressRestPosition3);
 
             FmComputeRotatedStiffnessMatrix<SoaTypes>(&rotatedStiffnessMat, stiffnessMat,
                 stressRestPosition0,
@@ -559,6 +574,22 @@ namespace AMD
                 stressRotation = tetRotation;
             }
 
+            FmVector3 stressRestPosition0;
+            FmVector3 stressRestPosition1;
+            FmVector3 stressRestPosition2;
+            FmVector3 stressRestPosition3;
+            stressShapeParams.ComputeRestPositions(&stressRestPosition0, &stressRestPosition1, &stressRestPosition2, &stressRestPosition3);
+
+            // Adapted from https://github.com/ericjlarsen/FEMFX
+            if (!meshSupportsPlasticity && tetShapeParams.clamped)
+            {
+                FmVector3 origin = tetMesh->vertsRestPos[tetVertIds.ids[3]];
+                stressRestPosition0 = tetMesh->vertsRestPos[tetVertIds.ids[0]] - origin;
+                stressRestPosition1 = tetMesh->vertsRestPos[tetVertIds.ids[1]] - origin;
+                stressRestPosition2 = tetMesh->vertsRestPos[tetVertIds.ids[2]] - origin;
+                stressRestPosition3 = FmInitVector3(0.0f);
+            }
+
 #if FM_SOA_TET_MATH
             uint batchNumTets = computeStiffnessBatch.numTets;
 
@@ -591,7 +622,8 @@ namespace AMD
             }
 
             computeStiffnessBatch.SetBatchSlice(computeStiffnessBatch.numTets,
-                stressShapeParams, tetRotation, materialParams.youngsModulus, materialParams.poissonsRatio, meshSupportsPlasticity);
+                stressShapeParams, stressRestPosition0, stressRestPosition1, stressRestPosition2, stressRestPosition3,
+                tetRotation, materialParams.youngsModulus, materialParams.poissonsRatio, meshSupportsPlasticity);
             computeStiffnessBatch.numTets++;
 #else
             FmTetStressMatrix stressMat;
@@ -602,11 +634,6 @@ namespace AMD
                 stressShapeParams.baryMatrix.col2,
                 stressShapeParams.GetVolume(),
                 materialParams.youngsModulus, materialParams.poissonsRatio);
-
-            // Recompute rest positions from the shape params so they reflect plastic deformation.
-            // Safe to recompute for non-plastic meshes also.
-            FmVector3 stressRestPosition0, stressRestPosition1, stressRestPosition2, stressRestPosition3;
-            stressShapeParams.ComputeRestPositions(&stressRestPosition0, &stressRestPosition1, &stressRestPosition2, &stressRestPosition3);
 
             FmTetRotatedStiffnessMatrix stiffness;
             FmComputeRotatedStiffnessMatrix(&stiffness, stiffnessMat,

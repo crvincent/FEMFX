@@ -40,6 +40,7 @@ namespace AMD
     {
         FmMatrix4 baryMatrix;   // Matrix that transforms a point within the tet to its barycentric coords
         float det;                 // Determinant of matrix m = [[1, 1, 1, 1], [x0, x1, x2, x3], [y0, y1, y2, y3], [z0, z1, z2, z3]] = 6 * volume
+        bool clamped;              // Shape inverse was regularized for a high-aspect-ratio tet
 
         inline float GetA0() const { return baryMatrix.col0.x; }
         inline float GetA1() const { return baryMatrix.col0.y; }
@@ -145,7 +146,8 @@ namespace AMD
     };
 
     // Compute quantities associated with shape of tet in rest position.
-    void FmComputeShapeParams(FmTetShapeParams* shapeParams, const FmVector3& p0, const FmVector3& p1, const FmVector3& p2, const FmVector3& p3);
+    void FmComputeShapeParams(FmTetShapeParams* shapeParams, const FmVector3& p0, const FmVector3& p1, const FmVector3& p2, const FmVector3& p3,
+        float minSingularValueRatio = 0.0f, float minSingularValue = 0.0f);
 
     // Compute strain matrix from shape parameters
     void FmComputeTetStrainMatrix(FmTetStrainMatrix* strainMat, const FmTetShapeParams& shapeParams);

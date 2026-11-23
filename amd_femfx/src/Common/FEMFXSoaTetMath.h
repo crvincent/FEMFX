@@ -59,6 +59,7 @@ namespace AMD
     {
         typename T::SoaMatrix4 baryMatrix;   // Matrix that transforms a point within the tet to its barycentric coords
         typename T::SoaFloat det;            // Determinant of matrix m = [[1, 1, 1, 1], [x0, x1, x2, x3], [y0, y1, y2, y3], [z0, z1, z2, z3]] = 6 * volume
+        typename T::SoaBool clamped;         // Shape inverse was regularized for a high-aspect-ratio tet
 
         inline typename T::SoaFloat GetA0() const { return baryMatrix.col0.x; }
         inline typename T::SoaFloat GetA1() const { return baryMatrix.col0.y; }
@@ -161,6 +162,7 @@ namespace AMD
     {
         result->baryMatrix = FmGetSlice<T>(soaResult.baryMatrix, idx);
         result->det = soaResult.det.getSlice(idx);
+        result->clamped = soaResult.clamped.getSlice(idx);
     }
 
     template<class T>
@@ -168,6 +170,7 @@ namespace AMD
     {
         FmSetSlice<T>(&soaData->baryMatrix, idx, data.baryMatrix);
         soaData->det.setSlice(idx, data.det);
+        soaData->clamped.setSlice(idx, data.clamped);
     }
 
     template<class T>
@@ -271,7 +274,35 @@ namespace AMD
                 for (uint lane = 0; lane < T::width; ++lane)
                     (component == 0 ? columns[column]->x : component == 1 ? columns[column]->y : component == 2 ? columns[column]->z : columns[column]->w).setSlice(lane, bary[column * 4 + component][lane]);
         for (uint lane = 0; lane < T::width; ++lane)
+        {
             resultShapeParams->det.setSlice(lane, det[lane]);
+            resultShapeParams->clamped.setSlice(lane, false);
+        }
+    }
+
+    template<class T>
+    void FmComputeShapeParams(
+        FmSoaTetShapeParams<T>* resultShapeParams,
+        const typename T::SoaVector3& p0,
+        const typename T::SoaVector3& p1,
+        const typename T::SoaVector3& p2,
+        const typename T::SoaVector3& p3,
+        typename T::SoaFloat minSingularValueRatio,
+        typename T::SoaFloat minSingularValue)
+    {
+        for (uint lane = 0; lane < T::width; ++lane)
+        {
+            FmTetShapeParams shapeParams;
+            FmComputeShapeParams(
+                &shapeParams,
+                FmGetSlice<T>(p0, lane),
+                FmGetSlice<T>(p1, lane),
+                FmGetSlice<T>(p2, lane),
+                FmGetSlice<T>(p3, lane),
+                minSingularValueRatio.getSlice(lane),
+                minSingularValue.getSlice(lane));
+            FmSetSlice<T>(resultShapeParams, lane, shapeParams);
+        }
     }
 
     template<class T>
