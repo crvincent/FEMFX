@@ -1076,8 +1076,7 @@ namespace AMD
 
             float epsilon = controlParams.epsilonCgPass;
             uint maxIterations = controlParams.maxCgIterationsCgPass;
-            FmRunMpcgSolve(deltavec, &meshData, &temps, epsilon, maxIterations,
-                scene->taskSystemCallbacks.ParallelFor, scene->params.numThreads);
+            FmRunMpcgSolve(deltavec, &meshData, &temps, epsilon, maxIterations);
 
             if (isLastIteration)
             {
@@ -1749,8 +1748,7 @@ namespace AMD
 
             float epsilon = controlParams.epsilonCgPass;
             uint maxIterations = controlParams.maxCgIterationsCgPass;
-            FmRunMpcgSolve(deltavec, &meshData, &temps, epsilon, maxIterations,
-                scene->taskSystemCallbacks.ParallelFor, scene->params.numThreads);
+            FmRunMpcgSolve(deltavec, &meshData, &temps, epsilon, maxIterations);
 
             if (isLastIteration)
             {

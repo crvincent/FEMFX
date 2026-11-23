@@ -30,7 +30,6 @@ THE SOFTWARE.
 
 #include "FEMFXCommonInternal.h"
 #include "FEMFXSolverMath.h"
-#include "FEMFXTaskSystemInterface.h"
 
 // Modified Preconditioned Conjugate Gradient (MPCG) Solver
 //
@@ -63,8 +62,6 @@ namespace AMD
         FmSVector3* p;
         FmSVector3* s;
         FmSVector3* h;
-        float* bdeltaSums;
-        float* deltaSums;
 
         static size_t GetNumBytes(uint maxVerts)
         {
@@ -72,9 +69,7 @@ namespace AMD
                 + FM_PAD_16(sizeof(*r) * maxVerts)
                 + FM_PAD_16(sizeof(*p) * maxVerts)
                 + FM_PAD_16(sizeof(*s) * maxVerts)
-                + FM_PAD_16(sizeof(*h) * maxVerts)
-                + FM_PAD_16(sizeof(*bdeltaSums) * maxVerts)
-                + FM_PAD_16(sizeof(*deltaSums) * maxVerts);
+                + FM_PAD_16(sizeof(*h) * maxVerts);
         }
 
         void Alloc(uint8_t** pBuffer, uint8_t* pBufferEnd, uint maxVerts)
@@ -84,8 +79,6 @@ namespace AMD
             p = FmAllocFromBuffer<FmSVector3>(pBuffer, maxVerts, pBufferEnd);
             s = FmAllocFromBuffer<FmSVector3>(pBuffer, maxVerts, pBufferEnd);
             h = FmAllocFromBuffer<FmSVector3>(pBuffer, maxVerts, pBufferEnd);
-            bdeltaSums = FmAllocFromBuffer<float>(pBuffer, maxVerts, pBufferEnd);
-            deltaSums = FmAllocFromBuffer<float>(pBuffer, maxVerts, pBufferEnd);
         }
     };
 
@@ -139,6 +132,5 @@ namespace AMD
 
     // Run unconstrained MPCG solve of implicit Euler step.
     // Returns numbers of steps taken.
-    uint FmRunMpcgSolve(FmSVector3* solution, FmMpcgSolverData* data, FmMpcgSolverDataTemps* temps, float relErrorTol, uint maxIterations,
-        FmParallelForCallback parallelFor = NULL, uint numThreads = 1);
+    uint FmRunMpcgSolve(FmSVector3* solution, FmMpcgSolverData* data, FmMpcgSolverDataTemps* temps, float relErrorTol, uint maxIterations);
 }

@@ -22,16 +22,20 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+//---------------------------------------------------------------------------------------
+// Modified Preconditioned Conjugate Gradient solver
+//---------------------------------------------------------------------------------------
+
 #include "FEMFXMpcgSolver.h"
-#include "FEMFXParallelFor.h"
 #include "FEMFXTetMesh.h"
 
 namespace AMD
 {
+
     void FmAllocMpcgSolverData(
         FmMpcgSolverData* data,
         uint maxVerts,
-        uint maxVertAdjacentVerts)
+        uint maxVertAdjacentVerts)  // bound on total number of adjacent verts ("adjacent" here including self), dependent on fracture
     {
         data->kinematicFlags = new bool[maxVerts];
         data->PInvDiag = new FmSMatrix3[maxVerts];
@@ -41,7 +45,7 @@ namespace AMD
         data->solverStateOffset = 0;
         data->A.submats = new FmSMatrix3[maxVerts + maxVertAdjacentVerts];
         data->A.indices = new uint[maxVerts + maxVertAdjacentVerts];
-        data->A.rowStarts = new uint[maxVerts + 1];
+        data->A.rowStarts = new uint[maxVerts + 1];       // last rowStart is end of matrix
         data->A.numRows = 0;
         data->maxVertAdjacentVerts = maxVertAdjacentVerts;
         data->hasKinematicVerts = false;
@@ -68,240 +72,416 @@ namespace AMD
         data->hasKinematicVerts = false;
     }
 
-    struct FmMpcgParallelTaskData
+    // Run unconstrained MPCG solve of implicit Euler step, assuming no kinematic vertices
+    // Returns numbers of steps taken.
+    // Terminates when mag of residual < epsilon * mag of right-hand-side or maxIterations reached.
+    uint FmRunMpcgSolveNoKinematic(FmSVector3* solution, FmMpcgSolverData* solverData, FmMpcgSolverDataTemps* solverDataTemps, float epsilon, uint maxIterations)
     {
-        FmMpcgSolverData* solverData;
-        FmMpcgSolverDataTemps* temps;
-        FmSVector3* solution;
-        uint numRows;
-        uint numTasks;
-        float alpha;
-        float deltaDivDeltaOld;
-    };
+        FmMpcgSolverData& data = *solverData;
+        FmMpcgSolverDataTemps& temps = *solverDataTemps;
 
-    static uint FmGetMpcgNumTasks(uint numRows, uint numThreads)
-    {
-        // Adapted from https://github.com/ericjlarsen/FEMFX
-        const uint minRowsPerTask = 1024;
-        uint maxTasks = FmMaxUint(numThreads * 4, 1);
-        uint numTasks = FmGetNumTasks(numRows, minRowsPerTask);
-        return FmMinUint(numTasks, maxTasks);
-    }
+        FmSparseMatrixSubmat3& FM_RESTRICT A = data.A;
+        FmSMatrix3* FM_RESTRICT PInvDiag = data.PInvDiag;
+        FmSVector3* FM_RESTRICT x = solution;
+        uint* FM_RESTRICT rowStarts = A.rowStarts;
+        uint* FM_RESTRICT indices = A.indices;
+        FmSMatrix3* FM_RESTRICT submats = A.submats;
+        FmSVector3* FM_RESTRICT r = temps.r;
+        FmSVector3* FM_RESTRICT p = temps.p;
+        FmSVector3* FM_RESTRICT s = temps.s;
+        FmSVector3* FM_RESTRICT h = temps.h;
+        FmSVector3* FM_RESTRICT b = solverData->b;
 
-    static void FmGetMpcgTaskRange(uint* begin, uint* end, const FmMpcgParallelTaskData& taskData, int32_t taskIndex)
-    {
-        FmGetIndexRangeEvenDistribution(begin, end, (uint)taskIndex, taskData.numTasks, taskData.numRows);
-    }
+        // Setup
+        // solution already set to initial estimate in InitMpcgSolve
 
-    static void FmRunMpcgParallelFor(
-        const char* taskName,
-        FmTaskFuncCallback taskFunc,
-        FmMpcgParallelTaskData* taskData,
-        FmParallelForCallback parallelFor)
-    {
-        if (parallelFor && taskData->numTasks > 1)
-        {
-            parallelFor(taskName, taskFunc, taskData, (int32_t)taskData->numTasks);
-        }
-        else
-        {
-            for (uint taskIndex = 0; taskIndex < taskData->numTasks; taskIndex++)
-            {
-                taskFunc(taskData, (int32_t)taskIndex, (int32_t)taskIndex + 1);
-            }
-        }
-    }
+        uint numRows3 = data.A.numRows;
 
-    static void FmTaskMpcgSetup(void* inTaskData, int32_t inTaskBeginIndex, int32_t)
-    {
-        FmMpcgParallelTaskData& taskData = *(FmMpcgParallelTaskData*)inTaskData;
-        FmMpcgSolverData& data = *taskData.solverData;
-        FmMpcgSolverDataTemps& temps = *taskData.temps;
-
-        uint begin, end;
-        FmGetMpcgTaskRange(&begin, &end, taskData, inTaskBeginIndex);
-
+        // z = solution constraints
+        // z' = (1 - S) * z = solution constraints or 0 for unconstrained verts 
+        // s = S * (b - A * z')
+        // r = S * (b - A * x)
+        // p = S * Pinv * r
+        // bdelta = s^T * Pinv * s
+        // delta = r^T * p
         float bdelta = 0.0f;
         float delta = 0.0f;
-        for (uint row3 = begin; row3 < end; row3++)
+        for (uint row3 = 0; row3 < numRows3; row3++)
+        {
+            uint rowStart = rowStarts[row3];
+            uint rowEnd = rowStarts[row3 + 1];
+
+            FmSVector3 sResult = b[row3];
+            FmSVector3 rResult = sResult;
+
+            FmSMatrix3 PInvDiag_row = PInvDiag[row3];
+
+            FM_ASSERT(rowEnd >= rowStart);
+
+            rResult -= mul(submats[row3], x[row3]);
+
+            for (uint i = rowStart; i < rowEnd; i++)
+            {
+                FmSMatrix3 submat = submats[i];
+                uint idx = indices[i];
+                FmSVector3 x_idx = x[idx];
+
+                FmSVector3 ax = mul(submat, x_idx);
+                rResult -= ax;
+            }
+
+            FmSVector3 pResult = mul(PInvDiag_row, rResult);
+
+            bdelta += dot(sResult, mul(PInvDiag_row, sResult));
+            delta += dot(rResult, pResult);
+
+            r[row3] = rResult;
+            p[row3] = pResult;
+        }
+
+        const float bdeltatol = 0.0f;
+        if (bdelta <= bdeltatol)
+        {
+            return 0;
+        }
+
+        uint numIterations = 0;
+        float deltaold = delta;
+
+        float tol = epsilon * epsilon * bdelta;
+
+        while (delta > tol && numIterations < maxIterations)
+        {
+            if (numIterations > 0)
+            {
+                // p = S * (h + (delta/deltaold)*p)
+                FmDiagx_VpSxV(p, h, delta / deltaold, p, numRows3);
+            }
+
+            // s = S * A * p
+            float pdots = 0.0f;
+            for (uint row3 = 0; row3 < numRows3; row3++)
+            {
+                uint rowStart = rowStarts[row3];
+                uint rowEnd = rowStarts[row3 + 1];
+
+#if 0
+                FM_ASSERT(rowEnd >= rowStart);
+                FmSVector3 p_row = p[row3];
+                FmSVector3 rowResult0 = mul(submats[row3], p_row);
+                FmSVector3 rowResult1 = FmInitSVector3(0.0f);
+                FmSVector3 rowResult2 = FmInitSVector3(0.0f);
+                FmSVector3 rowResult3 = FmInitSVector3(0.0f);
+
+                const uint groupSize = 4;
+                uint numGroups = rowSize / groupSize;
+
+                FmSMatrix3 submat0, submat1, submat2, submat3;
+                uint idx0, idx1, idx2, idx3;
+                FmSVector3 p0, p1, p2, p3;
+
+                if (numGroups > 0)
+                {
+                    submat0 = submats[rowStart];
+                    submat1 = submats[rowStart + 1];
+                    submat2 = submats[rowStart + 2];
+                    submat3 = submats[rowStart + 3];
+                    idx0 = indices[rowStart];
+                    idx1 = indices[rowStart + 1];
+                    idx2 = indices[rowStart + 2];
+                    idx3 = indices[rowStart + 3];
+                    p0 = p[idx0];
+                    p1 = p[idx1];
+                    p2 = p[idx2];
+                    p3 = p[idx3];
+
+                    uint groupStart = rowStart + 4;
+                    for (uint i = 0; i < numGroups - 1; i++)
+                    {
+                        rowResult0 += mul(submat0, p0);
+                        rowResult1 += mul(submat1, p1);
+                        rowResult2 += mul(submat2, p2);
+                        rowResult3 += mul(submat3, p3);
+
+                        submat0 = submats[groupStart];
+                        submat1 = submats[groupStart + 1];
+                        submat2 = submats[groupStart + 2];
+                        submat3 = submats[groupStart + 3];
+
+                        idx0 = indices[groupStart];
+                        idx1 = indices[groupStart + 1];
+                        idx2 = indices[groupStart + 2];
+                        idx3 = indices[groupStart + 3];
+
+                        p0 = p[idx0];
+                        p1 = p[idx1];
+                        p2 = p[idx2];
+                        p3 = p[idx3];
+
+                        groupStart += 4;
+                    }
+
+                    rowResult0 += mul(submat0, p0);
+                    rowResult1 += mul(submat1, p1);
+                    rowResult2 += mul(submat2, p2);
+                    rowResult3 += mul(submat3, p3);
+                }
+
+                uint startIdx = rowStart + numGroups * groupSize;
+                uint rowEnd = rowEnd;
+
+                if (startIdx < rowEnd)
+                {
+                    submat0 = submats[startIdx];
+                    idx0 = indices[startIdx];
+                    p0 = p[idx0];
+
+                    for (uint i = startIdx; i < rowEnd - 1; i++)
+                    {
+                        rowResult0 += mul(submat0, p0);
+
+                        submat0 = submats[i + 1];
+                        idx0 = indices[i + 1];
+                        p0 = p[idx0];
+                    }
+
+                    rowResult0 += mul(submat0, p0);
+                }
+
+                FmSVector3 rowResult = rowResult0 + rowResult1;
+                rowResult += (rowResult2 + rowResult3);
+#else
+
+                FM_ASSERT(rowEnd >= rowStart);
+
+                FmSMatrix3 submat = submats[row3];
+                FmSVector3 p_row = p[row3];
+                FmSVector3 rowResult = mul(submat, p_row);
+
+                for (uint i = rowStart; i < rowEnd; i++)
+                {
+                    submat = submats[i];
+                    uint idx = indices[i];
+                    FmSVector3 p_idx = p[idx];
+
+                    rowResult += mul(submat, p_idx);
+                }
+#endif
+
+                pdots += dot(p_row, rowResult);
+                s[row3] = rowResult;
+            }
+
+            // alpha = delta / (p^T * s)
+            float alpha = delta / pdots;
+
+            // x = x + alpha * p
+            // r = r - alpha * s
+            // h = Pinv * r
+            // delta = r^T * h
+            deltaold = delta;
+            delta = 0.0f;
+            for (uint row3 = 0; row3 < numRows3; row3++)
+            {
+                FmSVector3 x_row = x[row3];
+                FmSVector3 p_row = p[row3];
+                FmSVector3 r_row = r[row3];
+                FmSVector3 s_row = s[row3];
+                FmSMatrix3 diagRow = PInvDiag[row3];
+
+                FmSVector3 r_new = r_row - alpha * s_row;
+                FmSVector3 h_new = mul(diagRow, r_new);
+
+                delta += dot(r_new, h_new);
+
+                x[row3] = x_row + alpha * p_row;
+                r[row3] = r_new;
+                h[row3] = h_new;
+            }
+
+            numIterations++;
+        }
+
+        return numIterations;
+    }
+
+    // Run unconstrained MPCG solve of implicit Euler step.
+    // Returns numbers of steps taken.
+    // Terminates when mag of residual < epsilon * mag of right-hand-side or maxIterations reached.
+    uint FmRunMpcgSolve(FmSVector3* solution, FmMpcgSolverData* solverData, FmMpcgSolverDataTemps* solverDataTemps, float epsilon, uint maxIterations)
+    {
+        FM_TRACE_SCOPED_EVENT(MPCG_SOLVE);
+
+        if (!solverData->hasKinematicVerts)
+        {
+            return FmRunMpcgSolveNoKinematic(solution, solverData, solverDataTemps, epsilon, maxIterations);
+        }
+        FmMpcgSolverData& data = *solverData;
+        FmMpcgSolverDataTemps& temps = *solverDataTemps;
+
+        FmSparseMatrixSubmat3& FM_RESTRICT A = data.A;
+        FmSMatrix3* FM_RESTRICT PInvDiag = data.PInvDiag;
+        FmSVector3* FM_RESTRICT x = solution;
+        uint* FM_RESTRICT rowStarts = A.rowStarts;
+        uint* FM_RESTRICT indices = A.indices;
+        FmSMatrix3* FM_RESTRICT submats = A.submats;
+        FmSVector3* FM_RESTRICT r = temps.r;
+        FmSVector3* FM_RESTRICT p = temps.p;
+        FmSVector3* FM_RESTRICT s = temps.s;
+        FmSVector3* FM_RESTRICT h = temps.h;
+        FmSVector3* FM_RESTRICT b = solverData->b;
+        bool* FM_RESTRICT kinematicFlags = data.kinematicFlags;
+
+        // Setup
+        // solution already set to initial estimate in InitMpcgSolve
+
+        uint numRows3 = data.A.numRows;
+
+        // z = solution constraints
+        // z' = (1 - S) * z = solution constraints or 0 for unconstrained verts 
+        // s = S * (b - A * z')
+        // r = S * (b - A * x)
+        // p = S * Pinv * r
+        // bdelta = s^T * Pinv * s
+        // delta = r^T * p
+        float bdelta = 0.0f;
+        float delta = 0.0f;
+        for (uint row3 = 0; row3 < numRows3; row3++)
         {
             FmSVector3 sResult = FmInitSVector3(0.0f);
             FmSVector3 rResult = FmInitSVector3(0.0f);
             FmSVector3 pResult = FmInitSVector3(0.0f);
-
-            if (!data.hasKinematicVerts || !data.kinematicFlags[row3])
+            if (!kinematicFlags[row3])
             {
-                uint rowStart = data.A.rowStarts[row3];
-                uint rowEnd = data.A.rowStarts[row3 + 1];
-                sResult = data.b[row3];
+                uint rowStart = rowStarts[row3];
+                uint rowEnd = rowStarts[row3 + 1];
+
+                sResult = b[row3];
                 rResult = sResult;
+
+                FmSMatrix3 PInvDiag_row = PInvDiag[row3];
 
                 FM_ASSERT(rowEnd >= rowStart);
 
-                FmSVector3 ax = mul(data.A.submats[row3], taskData.solution[row3]);
-                if (data.hasKinematicVerts && data.kinematicFlags[row3])
                 {
-                    sResult -= ax;
-                }
-                rResult -= ax;
+                    FmSMatrix3 submat = submats[row3];
+                    uint idx = row3;
+                    FmSVector3 x_idx = x[idx];
+                    bool kinematic = kinematicFlags[idx];
 
-                for (uint i = rowStart; i < rowEnd; i++)
-                {
-                    uint idx = data.A.indices[i];
-                    ax = mul(data.A.submats[i], taskData.solution[idx]);
-                    if (data.hasKinematicVerts && data.kinematicFlags[idx])
+                    FmSVector3 ax = mul(submat, x_idx);
+                    if (kinematic)
                     {
                         sResult -= ax;
                     }
                     rResult -= ax;
                 }
 
-                pResult = mul(data.PInvDiag[row3], rResult);
-                bdelta += dot(sResult, mul(data.PInvDiag[row3], sResult));
+                for (uint i = rowStart; i < rowEnd; i++)
+                {
+                    FmSMatrix3 submat = submats[i];
+                    uint idx = indices[i];
+                    FmSVector3 x_idx = x[idx];
+                    bool kinematic = kinematicFlags[idx];
+
+                    FmSVector3 ax = mul(submat, x_idx);
+                    if (kinematic)
+                    {
+                        sResult -= ax;
+                    }
+                    rResult -= ax;
+                }
+
+                pResult = mul(PInvDiag_row, rResult);
+
+                bdelta += dot(sResult, mul(PInvDiag_row, sResult));
                 delta += dot(rResult, pResult);
             }
 
-            temps.r[row3] = rResult;
-            temps.p[row3] = pResult;
+            r[row3] = rResult;
+            p[row3] = pResult;
         }
 
-        temps.bdeltaSums[inTaskBeginIndex] = bdelta;
-        temps.deltaSums[inTaskBeginIndex] = delta;
-    }
-
-    static void FmTaskMpcgUpdateP(void* inTaskData, int32_t inTaskBeginIndex, int32_t)
-    {
-        FmMpcgParallelTaskData& taskData = *(FmMpcgParallelTaskData*)inTaskData;
-        FmMpcgSolverDataTemps& temps = *taskData.temps;
-
-        uint begin, end;
-        FmGetMpcgTaskRange(&begin, &end, taskData, inTaskBeginIndex);
-
-        for (uint row3 = begin; row3 < end; row3++)
-        {
-            if (taskData.solverData->hasKinematicVerts && taskData.solverData->kinematicFlags[row3])
-            {
-                temps.p[row3] = FmInitSVector3(0.0f);
-            }
-            else
-            {
-                temps.p[row3] = temps.h[row3] + taskData.deltaDivDeltaOld * temps.p[row3];
-            }
-        }
-    }
-
-    static void FmTaskMpcgMultiply(void* inTaskData, int32_t inTaskBeginIndex, int32_t)
-    {
-        FmMpcgParallelTaskData& taskData = *(FmMpcgParallelTaskData*)inTaskData;
-        FmMpcgSolverData& data = *taskData.solverData;
-        FmMpcgSolverDataTemps& temps = *taskData.temps;
-
-        uint begin, end;
-        FmGetMpcgTaskRange(&begin, &end, taskData, inTaskBeginIndex);
-
-        float pdots = 0.0f;
-        for (uint row3 = begin; row3 < end; row3++)
-        {
-            if (data.hasKinematicVerts && data.kinematicFlags[row3])
-            {
-                temps.s[row3] = FmInitSVector3(0.0f);
-                continue;
-            }
-
-            FmSVector3 rowResult = mul(data.A.submats[row3], temps.p[row3]);
-            for (uint i = data.A.rowStarts[row3]; i < data.A.rowStarts[row3 + 1]; i++)
-            {
-                rowResult += mul(data.A.submats[i], temps.p[data.A.indices[i]]);
-            }
-
-            pdots += dot(temps.p[row3], rowResult);
-            temps.s[row3] = rowResult;
-        }
-
-        temps.deltaSums[inTaskBeginIndex] = pdots;
-    }
-
-    static void FmTaskMpcgUpdate(void* inTaskData, int32_t inTaskBeginIndex, int32_t)
-    {
-        FmMpcgParallelTaskData& taskData = *(FmMpcgParallelTaskData*)inTaskData;
-        FmMpcgSolverData& data = *taskData.solverData;
-        FmMpcgSolverDataTemps& temps = *taskData.temps;
-
-        uint begin, end;
-        FmGetMpcgTaskRange(&begin, &end, taskData, inTaskBeginIndex);
-
-        float delta = 0.0f;
-        for (uint row3 = begin; row3 < end; row3++)
-        {
-            FmSVector3 rNew = temps.r[row3] - taskData.alpha * temps.s[row3];
-            FmSVector3 hNew = mul(data.PInvDiag[row3], rNew);
-
-            delta += dot(rNew, hNew);
-
-            taskData.solution[row3] += taskData.alpha * temps.p[row3];
-            temps.r[row3] = rNew;
-            temps.h[row3] = hNew;
-        }
-
-        temps.deltaSums[inTaskBeginIndex] = delta;
-    }
-
-    static float FmSumMpcgTaskValues(const float* values, uint numValues)
-    {
-        float sum = 0.0f;
-        for (uint i = 0; i < numValues; i++)
-        {
-            sum += values[i];
-        }
-        return sum;
-    }
-
-    uint FmRunMpcgSolve(
-        FmSVector3* solution,
-        FmMpcgSolverData* solverData,
-        FmMpcgSolverDataTemps* solverDataTemps,
-        float epsilon,
-        uint maxIterations,
-        FmParallelForCallback parallelFor,
-        uint numThreads)
-    {
-        FM_TRACE_SCOPED_EVENT(MPCG_SOLVE);
-
-        FmMpcgParallelTaskData taskData;
-        taskData.solverData = solverData;
-        taskData.temps = solverDataTemps;
-        taskData.solution = solution;
-        taskData.numRows = solverData->A.numRows;
-        taskData.numTasks = FmGetMpcgNumTasks(taskData.numRows, numThreads);
-
-        FmRunMpcgParallelFor("MpcgSetup", FmTaskMpcgSetup, &taskData, parallelFor);
-        float bdelta = FmSumMpcgTaskValues(solverDataTemps->bdeltaSums, taskData.numTasks);
-        float delta = FmSumMpcgTaskValues(solverDataTemps->deltaSums, taskData.numTasks);
-
-        if (bdelta <= 0.0f)
+        const float bdeltatol = 0.0f;
+        if (bdelta <= bdeltatol)
         {
             return 0;
         }
 
         uint numIterations = 0;
-        float deltaOld = delta;
-        float tolerance = epsilon * epsilon * bdelta;
+        float deltaold = delta;
 
-        while (delta > tolerance && numIterations < maxIterations)
+        float tol = epsilon * epsilon * bdelta;
+
+        while (delta > tol && numIterations < maxIterations)
         {
             if (numIterations > 0)
             {
-                taskData.deltaDivDeltaOld = delta / deltaOld;
-                FmRunMpcgParallelFor("MpcgUpdateP", FmTaskMpcgUpdateP, &taskData, parallelFor);
+                // p = S * (h + (delta/deltaold)*p)
+                FmDiagx_VpSxV(p, kinematicFlags, h, delta / deltaold, p, numRows3);
             }
 
-            FmRunMpcgParallelFor("MpcgMultiply", FmTaskMpcgMultiply, &taskData, parallelFor);
-            float pdots = FmSumMpcgTaskValues(solverDataTemps->deltaSums, taskData.numTasks);
-            taskData.alpha = delta / pdots;
+            // s = S * A * p
+            float pdots = 0.0f;
+            for (uint row3 = 0; row3 < numRows3; row3++)
+            {
+                bool kinematic = kinematicFlags[row3];
 
-            deltaOld = delta;
-            FmRunMpcgParallelFor("MpcgUpdate", FmTaskMpcgUpdate, &taskData, parallelFor);
-            delta = FmSumMpcgTaskValues(solverDataTemps->deltaSums, taskData.numTasks);
+                if (kinematic)
+                {
+                    s[row3] = FmInitSVector3(0.0f);
+                }
+                else
+                {
+                    uint rowStart = rowStarts[row3];
+                    uint rowEnd = rowStarts[row3 + 1];
+
+                    FM_ASSERT(rowEnd >= rowStart);
+
+                    FmSMatrix3 submat = submats[row3];
+                    FmSVector3 p_row = p[row3];
+                    FmSVector3 rowResult = mul(submat, p_row);
+
+                    for (uint i = rowStart; i < rowEnd; i++)
+                    {
+                        submat = submats[i];
+                        uint idx = indices[i];
+                        FmSVector3 p_idx = p[idx];
+
+                        rowResult += mul(submat, p_idx);
+                    }
+
+                    pdots += dot(p_row, rowResult);
+                    s[row3] = rowResult;
+                }
+            }
+
+            // alpha = delta / (p^T * s)
+            float alpha = delta / pdots;
+
+            // x = x + alpha * p
+            // r = r - alpha * s
+            // h = Pinv * r
+            // delta = r^T * h
+            deltaold = delta;
+            delta = 0.0f;
+            for (uint row3 = 0; row3 < numRows3; row3++)
+            {
+                FmSVector3 x_row = x[row3];
+                FmSVector3 p_row = p[row3];
+                FmSVector3 r_row = r[row3];
+                FmSVector3 s_row = s[row3];
+                FmSMatrix3 diagRow = PInvDiag[row3];
+
+                FmSVector3 r_new = r_row - alpha * s_row;
+                FmSVector3 h_new = mul(diagRow, r_new);
+
+                delta += dot(r_new, h_new);
+
+                x[row3] = x_row + alpha * p_row;
+                r[row3] = r_new;
+                h[row3] = h_new;
+            }
 
             numIterations++;
         }

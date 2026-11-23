@@ -54,11 +54,6 @@ namespace AMD
     // Submit asynchronous task to task scheduler, which should run FmExecuteTask with TaskFunc, taskData and taskIndex arguments
     typedef void(*FmSubmitAsyncTaskCallback)(const char* taskName, FmTaskFuncCallback TaskFunc, void* taskData, int32_t taskBeginIndex, int32_t taskEndIndex);
 
-    // Run an array of tasks in parallel and wait for all to complete.
-    // If used from a task, the implementation must help execute queued tasks while waiting
-    // to avoid deadlocking all workers.
-    typedef void(*FmParallelForCallback)(const char* taskName, FmTaskFuncCallback TaskFunc, void* taskData, int32_t taskCount);
-
     // Lib holds a void* to external object representing an event which can be waited on until triggered by a task
     typedef void FmSyncEvent;
 
@@ -94,6 +89,10 @@ namespace AMD
     // NOTE: For async threading to work, the implementation must execute each task by passing the task to FmExecuteTask().
     typedef void(*FmSubmitTaskCallback)(const char* taskName, FmTaskFuncCallback TaskFunc, void* taskData, int32_t taskBeginIndex, int32_t taskEndIndex, FmTaskWaitCounter* waitCounter);
 
+    // Run an array of tasks in parallel and wait for all to complete.
+    // Makes taskCount calls to TaskFunc, passing it taskData and a unique taskIndex in range 0..taskCount-1
+    // NOTE: For async threading to work, the implementation must execute each task by passing the task to FmExecuteTask().
+    typedef void(*FmParallelForCallback)(const char* taskName, FmTaskFuncCallback TaskFunc, void* taskData, int32_t taskCount);
 #endif
 
     // Set of callbacks that define the interface to external scheduler.
@@ -106,12 +105,12 @@ namespace AMD
         FmDestroySyncEventCallback DestroySyncEvent;
         FmWaitForSyncEventCallback WaitForSyncEvent;
         FmTriggerSyncEventCallback TriggerSyncEvent;
-        FmParallelForCallback ParallelFor; // Optional blocking, work-helping parallel-for for nested solver work
 #if !FM_ASYNC_THREADING
         FmCreateTaskWaitCounterCallback CreateTaskWaitCounter;
         FmWaitForTaskWaitCounterCallback WaitForTaskWaitCounter;
         FmDestroyTaskWaitCounterCallback DestroyTaskWaitCounter;
         FmSubmitTaskCallback SubmitTask;
+        FmParallelForCallback ParallelFor;
 #endif
 
         FmTaskSystemCallbacks()
@@ -123,13 +122,13 @@ namespace AMD
             DestroySyncEvent = NULL;
             WaitForSyncEvent = NULL;
             TriggerSyncEvent = NULL;
-            ParallelFor = NULL;
 #if !FM_ASYNC_THREADING
             GetTaskSystemNumThreads = NULL;
             CreateTaskWaitCounter = NULL;
             WaitForTaskWaitCounter = NULL;
             DestroyTaskWaitCounter = NULL;
             SubmitTask = NULL;
+            ParallelFor = NULL;
 #endif
         }
 
@@ -145,9 +144,9 @@ namespace AMD
             , FmCreateTaskWaitCounterCallback InCreateTaskWaitCounter,
             FmWaitForTaskWaitCounterCallback InWaitForTaskWaitCounter,
             FmDestroyTaskWaitCounterCallback InDestroyTaskWaitCounter,
-            FmSubmitTaskCallback InSubmitTask
+            FmSubmitTaskCallback InSubmitTask,
+            FmParallelForCallback InParallelFor
 #endif
-            , FmParallelForCallback InParallelFor = NULL
             )
         {
             GetTaskSystemNumThreads = InGetTaskSystemNumThreads;
@@ -157,12 +156,12 @@ namespace AMD
             DestroySyncEvent = InDestroySyncEvent;
             WaitForSyncEvent = InWaitForSyncEvent;
             TriggerSyncEvent = InTriggerSyncEvent;
-            ParallelFor = InParallelFor;
 #if !FM_ASYNC_THREADING
             CreateTaskWaitCounter = InCreateTaskWaitCounter;
             WaitForTaskWaitCounter = InWaitForTaskWaitCounter;
             DestroyTaskWaitCounter = InDestroyTaskWaitCounter;
             SubmitTask = InSubmitTask;
+            ParallelFor = InParallelFor;
 #endif
         }
     };
