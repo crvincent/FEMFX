@@ -1258,7 +1258,8 @@ namespace AMD
             timestep); // Initial est is current velocity
 
         // Run MPCG to compute velocities at end of step, for linear implicit Euler step.
-        FmRunMpcgSolve(solverTemps.solution, solverData, &solverTemps, epsilonCG, tetMesh->maxUnconstrainedSolveIterations);
+        FmRunMpcgSolve(solverTemps.solution, solverData, &solverTemps, epsilonCG, tetMesh->maxUnconstrainedSolveIterations,
+            scene->taskSystemCallbacks.ParallelFor, scene->params.numThreads);
 
         // Reset vertOffset
         solverData->solverStateOffset = FM_INVALID_ID;
