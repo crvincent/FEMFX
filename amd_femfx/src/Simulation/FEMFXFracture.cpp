@@ -136,6 +136,8 @@ namespace AMD
         FmFractureTetIdMap tetIdMap;
         const uint maxTetIdMapElements = FM_MAX_VERT_INCIDENT_TETS * 2;
         FmFractureTetIdMapElement* tetIdMapElements = FmAllocFromBuffer<FmFractureTetIdMapElement>(&pTempBuffer, maxTetIdMapElements, pTempBufferEnd);
+        // Adapted from https://github.com/ericjlarsen/FEMFX
+        uint* tetsQueue = FmAllocFromBuffer<uint>(&pTempBuffer, FM_MAX_VERT_INCIDENT_TETS, pTempBufferEnd);
 
         uint numVerts = tetMesh->numVerts;
         uint maxVerts = tetMesh->maxVerts;
@@ -205,8 +207,6 @@ namespace AMD
             }
 
             // Find connected components of tets connected by faces
-            uint* tetsQueue = FmAllocFromBuffer<uint>(&pTempBuffer, FM_MAX_VERT_INCIDENT_TETS, pTempBufferEnd);
-
             uint numComponents = 0;
             uint numTetsReached = 0;
             uint originalVertexComponentId = 0; // one component with FM_TET_FLAG_KINEMATIC will be attached to original vertex
@@ -422,6 +422,8 @@ namespace AMD
         FmFractureTetIdMapElement* tetIdMapElements = FmAllocFromBuffer<FmFractureTetIdMapElement>(&pTempBuffer, maxTetIdMapElements, pTempBufferEnd);
 
         FmMakeSplitsLocalTet* localTets = FmAllocFromBuffer<FmMakeSplitsLocalTet>(&pTempBuffer, FM_MAX_VERT_INCIDENT_TETS, pTempBufferEnd);
+        // Adapted from https://github.com/ericjlarsen/FEMFX
+        uint* tetsQueue = FmAllocFromBuffer<uint>(&pTempBuffer, FM_MAX_VERT_INCIDENT_TETS, pTempBufferEnd);
 
         FmRandomState randomState(tetMesh->objectId);
 
@@ -589,8 +591,6 @@ namespace AMD
             // Find connected components of tets which can't be split due to fracture disabled flags.
             // Later will allow fracture only between tets of different components.
             // Add face-connected tets to queue - component complete when all queue indices processed.
-            uint* tetsQueue = FmAllocFromBuffer<uint>(&pTempBuffer, FM_MAX_VERT_INCIDENT_TETS, pTempBufferEnd);
-
             uint numComponents = 0;
             uint numTetsReached = 0;
 

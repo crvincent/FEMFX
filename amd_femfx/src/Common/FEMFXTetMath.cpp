@@ -37,7 +37,9 @@ namespace AMD
         const FmVector3& p0,
         const FmVector3& p1,
         const FmVector3& p2,
-        const FmVector3& p3)
+        const FmVector3& p3,
+        float minSingularValueRatio,
+        float minSingularValue)
     {
         FmTetShapeParams shapeParams;
 
@@ -104,6 +106,7 @@ namespace AMD
         float m33 = x10*y2 + x02*y1 + x21*y0;
 
         shapeParams.det = det;
+        shapeParams.clamped = false;
 
         // baryMatrix transforms [x, y, z, 1]^T to barycentric coords
 
@@ -130,6 +133,49 @@ namespace AMD
                 m10 * invDet,
                 m20 * invDet,
                 m30 * invDet));
+
+        // Adapted from https://github.com/ericjlarsen/FEMFX
+        if (minSingularValueRatio > 0.0f || minSingularValue > 0.0f)
+        {
+            FmMatrix3 shapeMatrix(
+                p1 - p0,
+                p2 - p0,
+                p3 - p0);
+            shapeParams.det = fabsf(determinant(shapeMatrix));
+            FmMatrix3 U, V;
+            FmVector3 sigma;
+            FmSvd3x3(&U, &sigma, &V, shapeMatrix);
+
+            minSingularValue = FmMaxFloat(sigma.x * minSingularValueRatio, minSingularValue);
+
+            if (sigma.x < minSingularValue)
+            {
+                sigma.x = minSingularValue;
+                shapeParams.clamped = true;
+            }
+            if (sigma.y < minSingularValue)
+            {
+                sigma.y = minSingularValue;
+                shapeParams.clamped = true;
+            }
+            if (sigma.z < minSingularValue)
+            {
+                sigma.z = minSingularValue;
+                shapeParams.clamped = true;
+            }
+
+            if (shapeParams.clamped)
+            {
+                FmMatrix3 shapeMatrixInv = mul(mul(V, FmMatrix3::scale(inv(sigma))), transpose(U));
+                FmVector4 baryCol0(-sum(shapeMatrixInv.col0), shapeMatrixInv.col0.x, shapeMatrixInv.col0.y, shapeMatrixInv.col0.z);
+                FmVector4 baryCol1(-sum(shapeMatrixInv.col1), shapeMatrixInv.col1.x, shapeMatrixInv.col1.y, shapeMatrixInv.col1.z);
+                FmVector4 baryCol2(-sum(shapeMatrixInv.col2), shapeMatrixInv.col2.x, shapeMatrixInv.col2.y, shapeMatrixInv.col2.z);
+                FmVector4 baryCol3 = -(baryCol0 * p0.x + baryCol1 * p0.y + baryCol2 * p0.z);
+                baryCol3.x += 1.0f;
+
+                shapeParams.baryMatrix = FmMatrix4(baryCol0, baryCol1, baryCol2, baryCol3);
+            }
+        }
 
         *resultShapeParams = shapeParams;
     }

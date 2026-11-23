@@ -30,8 +30,6 @@ THE SOFTWARE.
 #include "FEMFXScene.h"
 #include "FEMFXUpdateTetState.h"
 
-#define FM_UPDATE_TET_BATCH_SIZE 64
-
 namespace AMD
 {
     // Input data required for updating tet state: tet rotation, stiffness, plasticity, and testing fracture
@@ -72,6 +70,8 @@ namespace AMD
         float        plasticCreep;
         float        plasticMin;
         float        plasticMax;
+        float        minShapeSingularValueRatio;
+        float        minShapeSingularValue;
         bool         preserveVolume;
 
         bool         testFracture;       // Based on tet properties, set if need to test fracture
@@ -160,6 +160,8 @@ namespace AMD
         typename T::SoaFloat plasticCreep;
         typename T::SoaFloat plasticMin;
         typename T::SoaFloat plasticMax;
+        typename T::SoaFloat minShapeSingularValueRatio;
+        typename T::SoaFloat minShapeSingularValue;
         typename T::SoaBool  preserveVolume;
 
         typename T::SoaBool  testFracture;       // Based on tet properties, set if need to test fracture
@@ -273,6 +275,8 @@ namespace AMD
 
             input.shapeParams.det = typename SoaTypes::SoaFloat(0.0f);
             input.stressShapeParams.det = typename SoaTypes::SoaFloat(0.0f);
+            input.shapeParams.clamped = typename SoaTypes::SoaBool(false);
+            input.stressShapeParams.clamped = typename SoaTypes::SoaBool(false);
             input.youngsModulus = typename SoaTypes::SoaFloat(0.0f);
             input.poissonsRatio = typename SoaTypes::SoaFloat(0.0f);
             input.fractureStressThreshold = typename SoaTypes::SoaFloat(0.0f);
@@ -280,6 +284,8 @@ namespace AMD
             input.plasticCreep = typename SoaTypes::SoaFloat(0.0f);
             input.plasticMin = typename SoaTypes::SoaFloat(0.0f);
             input.plasticMax = typename SoaTypes::SoaFloat(0.0f);
+            input.minShapeSingularValueRatio = typename SoaTypes::SoaFloat(0.0f);
+            input.minShapeSingularValue = typename SoaTypes::SoaFloat(0.0f);
             input.preserveVolume = typename SoaTypes::SoaBool(false);
             input.testFracture = typename SoaTypes::SoaBool(false);
             input.updatePlasticity = typename SoaTypes::SoaBool(false);
@@ -313,6 +319,10 @@ namespace AMD
 
             input.shapeParams.det.setSlice(idx, inputSlice.shapeParams.det);
             input.stressShapeParams.det.setSlice(idx, inputSlice.stressShapeParams.det);
+            input.shapeParams.clamped.setSlice(idx, inputSlice.shapeParams.clamped);
+            input.stressShapeParams.clamped.setSlice(idx, inputSlice.stressShapeParams.clamped);
+            input.minShapeSingularValueRatio.setSlice(idx, inputSlice.minShapeSingularValueRatio);
+            input.minShapeSingularValue.setSlice(idx, inputSlice.minShapeSingularValue);
 
             if (meshSupportsPlasticity)
             {
@@ -522,6 +532,8 @@ namespace AMD
 
         tetUpdateInput->shapeParams = tetShapeParams;
         tetUpdateInput->stressShapeParams = stressShapeParams;
+        tetUpdateInput->minShapeSingularValueRatio = tetMesh.minShapeSingularValueRatio;
+        tetUpdateInput->minShapeSingularValue = tetMesh.minShapeSingularValue;
 
         tetUpdateInput->youngsModulus = tetStressMaterialParams.youngsModulus;
         tetUpdateInput->poissonsRatio = tetStressMaterialParams.poissonsRatio;
@@ -565,7 +577,8 @@ namespace AMD
         const FmVector3& deformedPosition3,
         const FmVector3& stress0,
         const FmVector3& stress1,
-        float plasticYieldThreshold, float plasticCreep, float plasticMin, float plasticMax, bool preserveVolume)
+        float plasticYieldThreshold, float plasticCreep, float plasticMin, float plasticMax, bool preserveVolume,
+        float minShapeSingularValueRatio, float minShapeSingularValue)
     {
         (void)tetRotationInv;
         FmMatrix3 plasticDeformationMatrix = inPlasticDeformationMatrix;
@@ -653,7 +666,8 @@ namespace AMD
                 FmVector3 plasticRestPosition1 = offsets.col1;
                 FmVector3 plasticRestPosition2 = offsets.col2;
 
-                FmComputeShapeParams(&plasticShapeParams, plasticRestPosition0, plasticRestPosition1, plasticRestPosition2, plasticRestPosition3);
+                FmComputeShapeParams(&plasticShapeParams, plasticRestPosition0, plasticRestPosition1, plasticRestPosition2, plasticRestPosition3,
+                    minShapeSingularValueRatio, minShapeSingularValue);
 
                 *outPlasticDeformationMatrix = plasticDeformationMatrix;
                 *outPlasticShapeParams = plasticShapeParams;
@@ -702,7 +716,8 @@ namespace AMD
         const typename T::SoaVector3& deformedPosition3,
         const typename T::SoaVector3& stress0,
         const typename T::SoaVector3& stress1,
-        typename T::SoaFloat plasticYieldThreshold, typename T::SoaFloat plasticCreep, typename T::SoaFloat plasticMin, typename T::SoaFloat plasticMax, typename T::SoaBool preserveVolume)
+        typename T::SoaFloat plasticYieldThreshold, typename T::SoaFloat plasticCreep, typename T::SoaFloat plasticMin, typename T::SoaFloat plasticMax, typename T::SoaBool preserveVolume,
+        typename T::SoaFloat minShapeSingularValueRatio, typename T::SoaFloat minShapeSingularValue)
     {
         (void)tetRotationInv;
         typename T::SoaMatrix3 plasticDeformationMatrix = inPlasticDeformationMatrix;
@@ -796,7 +811,8 @@ namespace AMD
                 typename T::SoaVector3 plasticRestPosition1 = offsets.col1;
                 typename T::SoaVector3 plasticRestPosition2 = offsets.col2;
 
-                FmComputeShapeParams<T>(&plasticShapeParams, plasticRestPosition0, plasticRestPosition1, plasticRestPosition2, plasticRestPosition3);
+                FmComputeShapeParams<T>(&plasticShapeParams, plasticRestPosition0, plasticRestPosition1, plasticRestPosition2, plasticRestPosition3,
+                    minShapeSingularValueRatio, minShapeSingularValue);
 
                 *outPlasticDeformationMatrix = plasticDeformationMatrix;
                 *outPlasticShapeParams = plasticShapeParams;
@@ -978,7 +994,8 @@ namespace AMD
                             tetUpdateInput.deformedPosition3,
                             stress0,
                             stress1,
-                            tetUpdateInput.plasticYieldThreshold, tetUpdateInput.plasticCreep, tetUpdateInput.plasticMin, tetUpdateInput.plasticMax, tetUpdateInput.preserveVolume);
+                            tetUpdateInput.plasticYieldThreshold, tetUpdateInput.plasticCreep, tetUpdateInput.plasticMin, tetUpdateInput.plasticMax, tetUpdateInput.preserveVolume,
+                            tetUpdateInput.minShapeSingularValueRatio, tetUpdateInput.minShapeSingularValue);
 
                     tetUpdateOutput->updatePlasticity = updateNeeded;
                 }
@@ -1145,7 +1162,8 @@ namespace AMD
                             tetUpdateInput.deformedPosition3,
                             stress0,
                             stress1,
-                            tetUpdateInput.plasticYieldThreshold, tetUpdateInput.plasticCreep, tetUpdateInput.plasticMin, tetUpdateInput.plasticMax, tetUpdateInput.preserveVolume);
+                            tetUpdateInput.plasticYieldThreshold, tetUpdateInput.plasticCreep, tetUpdateInput.plasticMin, tetUpdateInput.plasticMax, tetUpdateInput.preserveVolume,
+                            tetUpdateInput.minShapeSingularValueRatio, tetUpdateInput.minShapeSingularValue);
 
                     tetUpdateOutput->updatePlasticity = tetUpdateInput.updatePlasticity & updateNeeded;
                 }
@@ -1353,7 +1371,7 @@ namespace AMD
         FmTetMesh* tetMesh;
         FmVector3 centerOfMass;
         uint numTets;
-        uint numTetTasks;
+        uint tetBatchSize;
 
         bool runFracture;
         bool updatePlasticity;
@@ -1362,7 +1380,7 @@ namespace AMD
 
         FmTaskDataUpdateTetState(
             FmScene* inScene, FmTetMesh* inTetMesh, const FmVector3& inCenterOfMass,
-            uint inNumTets, uint inNumTetTasks,
+            uint inNumTets, uint inTetBatchSize,
             bool inRunFracture, bool inUpdatePlasticity, bool inMeshSupportsPlasticity, bool inComputingDeformation)
         {
             FmAtomicWrite(&removedKinematicFlag.val, 0);
@@ -1371,7 +1389,7 @@ namespace AMD
             tetMesh = inTetMesh;
             centerOfMass = inCenterOfMass;
             numTets = inNumTets;
-            numTetTasks = inNumTetTasks;
+            tetBatchSize = inTetBatchSize;
             runFracture = inRunFracture;
             updatePlasticity = inUpdatePlasticity;
             meshSupportsPlasticity = inMeshSupportsPlasticity;
@@ -1394,7 +1412,7 @@ namespace AMD
         bool computingStrainMag = taskData->computingStrainMag;
 
         uint beginIdx, endIdx;
-        FmGetIndexRange(&beginIdx, &endIdx, (uint)inTaskBeginIndex, FM_UPDATE_TET_BATCH_SIZE, taskData->numTets);
+        FmGetIndexRange(&beginIdx, &endIdx, (uint)inTaskBeginIndex, taskData->tetBatchSize, taskData->numTets);
 
         bool removedKinematicFlag;
         uint maxUnconstrainedSolveIterations;
@@ -1471,16 +1489,17 @@ namespace AMD
 
         bool computingStrainMag = FM_IS_SET(tetMesh->flags, FM_OBJECT_FLAG_COMPUTE_TET_STRAIN_MAG);
         
-        uint numUpdateTetTasks = FmGetNumTasks(tetMesh->numTets, FM_UPDATE_TET_BATCH_SIZE); 
+        uint updateTetBatchSize = scene ? FmMaxUint(scene->params.updateTetBatchSize, 1u) : 128;
+        uint numUpdateTetTasks = FmGetNumTasks(numTets, updateTetBatchSize);
 
 #if FM_ASYNC_THREADING
         if (parentTaskData)
         {
-            if (numTets > 128)
+            if (numUpdateTetTasks > 1)
             {
                 // If enough tets, parallelize using a parallel for
                 FmTaskDataUpdateTetState* taskData = new FmTaskDataUpdateTetState(
-                    scene, tetMesh, centerOfMass, numTets, numUpdateTetTasks, runFracture, updatePlasticity, meshSupportsPlasticity, computingStrainMag);
+                    scene, tetMesh, centerOfMass, numTets, updateTetBatchSize, runFracture, updatePlasticity, meshSupportsPlasticity, computingStrainMag);
 
                 taskData->progress.Init(numUpdateTetTasks, FmTaskFuncFinishUpdateTetsAndFracture, taskData);
                 taskData->parentTaskData = parentTaskData;

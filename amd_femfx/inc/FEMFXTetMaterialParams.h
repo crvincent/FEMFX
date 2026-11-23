@@ -48,6 +48,8 @@ namespace AMD
 
         float lowerDeformationLimit;    // Value > 0 and <= 1, or unlimited if = 0.  Constrains minimum scale of deformation.
         float upperDeformationLimit;    // Value >= 1, or unlimited if = 0.  Constrains maximum scale of deformation.
+        // Adapted from https://github.com/ericjlarsen/FEMFX
+        bool  adjustShapeParams;        // Adjusts shape parameters of narrow tetrahedra to improve convergence.
 
         inline FmTetMaterialParams() :
             restDensity(50.0f), youngsModulus(1.0e5f), poissonsRatio(0.25f),
@@ -55,7 +57,8 @@ namespace AMD
             fractureStressThreshold(5.0e3f),
             maxUnconstrainedSolveIterations(FM_DEFAULT_MAX_CG_ITERATIONS),
             lowerDeformationLimit(0.0f),
-            upperDeformationLimit(0.0f)
+            upperDeformationLimit(0.0f),
+            adjustShapeParams(true)
         {}
 
         inline FmTetMaterialParams(
@@ -63,7 +66,8 @@ namespace AMD
             float inPlasticYieldThreshold, float inPlasticStrainCreep,
             float inPlasticStrainMin, float inPlasticStrainMax,
             float inFractureStressThreshold, uint inMaxCGIterations,
-            float inLowerDeformationLimit = 0.0f, float inUpperDeformationLimit = 0.0f)
+            float inLowerDeformationLimit = 0.0f, float inUpperDeformationLimit = 0.0f,
+            bool inAdjustShapeParams = true)
         {
             restDensity = inRestDensity;
             youngsModulus = inYoungsModulus;
@@ -76,6 +80,7 @@ namespace AMD
             maxUnconstrainedSolveIterations = inMaxCGIterations;
             lowerDeformationLimit = inLowerDeformationLimit;
             upperDeformationLimit = inUpperDeformationLimit;
+            adjustShapeParams = inAdjustShapeParams;
         }
     };
 }

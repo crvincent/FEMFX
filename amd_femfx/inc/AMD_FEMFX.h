@@ -502,6 +502,8 @@ namespace AMD
 
         uint numThreads; // Number of worker threads processing step update, set at start of frame.
 
+        uint updateTetBatchSize; // Number of tets processed by each tet-state update task
+
         float timestep; // Timestep used in integration
         float simTime;  // Elapsed time of simulation
 
@@ -546,6 +548,7 @@ namespace AMD
             collisionPlanes.minZ = -FLT_MAX;
             collisionPlanes.maxZ = FLT_MAX;
             numThreads = 1;
+            updateTetBatchSize = 128;
             timestep = (1.0f / 60.0f);
             simTime = 0.0f;
             distContactBias = 0.002f;

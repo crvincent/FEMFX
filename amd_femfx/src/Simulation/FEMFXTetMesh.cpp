@@ -74,6 +74,8 @@ namespace AMD
             FmInitTetMaterialParams(tetMesh, tId, materialParams);
         }
         tetMesh->removeKinematicStressThreshold = materialParams.fractureStressThreshold * 4.0f;
+        tetMesh->minShapeSingularValue = materialParams.adjustShapeParams ? FM_DEFAULT_MIN_SHAPE_SINGULAR_VALUE : 0.0f;
+        tetMesh->minShapeSingularValueRatio = materialParams.adjustShapeParams ? FM_DEFAULT_MIN_SHAPE_SINGULAR_VALUE_RATIO : 0.0f;
     }
 
     size_t FmGetMpcgSolverSize(uint maxVerts, uint maxVertAdjacentVerts)
@@ -2512,7 +2514,8 @@ namespace AMD
             FmVector3 tetRestPosition3 = tetMesh->vertsRestPos[tetVertIds.ids[3]];
 
             FmTetShapeParams shapeParams;
-            FmComputeShapeParams(&shapeParams, tetRestPosition0, tetRestPosition1, tetRestPosition2, tetRestPosition3);
+            FmComputeShapeParams(&shapeParams, tetRestPosition0, tetRestPosition1, tetRestPosition2, tetRestPosition3,
+                tetMesh->minShapeSingularValueRatio, tetMesh->minShapeSingularValue);
 
             // save shape parameters
             tetShapeParams = shapeParams;
