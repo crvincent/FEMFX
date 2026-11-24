@@ -2554,6 +2554,77 @@ namespace AMD
             FmUpdateVelStats(&tetMesh.velStats, length(tetMesh.vertsVel[i]), 1000);
         }
 
+        // Try to handle any breakdancing pieces on the ground.
+        bool touchingFloor = false;
+        FmConstraintsBuffer* constraintsBuffer = scene->constraintsBuffer;
+
+        for (uint i = 0; i < constraintIsland->numConstraints; i++)
+        {
+            const FmConstraintReference& reference = constraintIsland->constraintRefs[i];
+            if (reference.type != FM_CONSTRAINT_TYPE_DISTANCE_CONTACT)
+            {
+                continue;
+            }
+
+            const FmDistanceContactPairInfo& pair =
+                constraintsBuffer->distanceContactsPairInfo[reference.idx];
+            const FmDistanceContact& contact =
+                constraintsBuffer->distanceContacts[reference.idx];
+
+            if (pair.objectIdA == tetMesh.objectId
+                && FM_IS_SET(pair.flags, FM_CONSTRAINT_FLAG_OBJECTB_COLLISION_PLANE)
+                && contact.normal.y > 0.5f)
+            {
+                touchingFloor = true;
+                break;
+            }
+        }
+
+        if (touchingFloor && numFixedPoints == 0)
+        {
+            static const float rollingResistanceRate = 4.0f;
+            FmVector3 center = FmInitVector3(0.0f);
+            FmVector3 centerVelocity = FmInitVector3(0.0f);
+            float totalMass = 0.0f;
+
+            for (uint i = 0; i < tetMesh.numVerts; i++)
+            {
+                float mass = tetMesh.vertsMass[i];
+                center += tetMesh.vertsPos[i] * mass;
+                centerVelocity += tetMesh.vertsVel[i] * mass;
+                totalMass += mass;
+            }
+
+            if (totalMass > 0.0f)
+            {
+                center /= totalMass;
+                centerVelocity /= totalMass;
+                FmVector3 angularMomentum = FmInitVector3(0.0f);
+                float scalarInertia = 0.0f;
+
+                for (uint i = 0; i < tetMesh.numVerts; i++)
+                {
+                    const FmVector3 radius = tetMesh.vertsPos[i] - center;
+                    const FmVector3 relativeVelocity = tetMesh.vertsVel[i] - centerVelocity;
+                    const float mass = tetMesh.vertsMass[i];
+                    angularMomentum += cross(radius, relativeVelocity) * mass;
+                    scalarInertia += mass * lengthSqr(radius) * (2.0f / 3.0f);
+                }
+
+                if (scalarInertia > FLT_EPSILON)
+                {
+                    const FmVector3 angularVelocity = angularMomentum / scalarInertia;
+                    const float damping = 1.0f - expf(-rollingResistanceRate * timestep);
+
+                    for (uint i = 0; i < tetMesh.numVerts; i++)
+                    {
+                        const FmVector3 radius = tetMesh.vertsPos[i] - center;
+                        tetMesh.vertsVel[i] -= cross(angularVelocity, radius) * damping;
+                    }
+                }
+            }
+        }
+
         if (dynamicVert)
         {
             tetMesh.flags |= (FM_OBJECT_FLAG_POS_CHANGED | FM_OBJECT_FLAG_VEL_CHANGED);
